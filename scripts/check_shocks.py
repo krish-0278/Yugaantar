@@ -21,7 +21,7 @@ from monsoon.infer import Simulator, decode_doy_last
 from monsoon.postproc import apply as apply_postproc
 from monsoon.rollout import rollout
 from monsoon.shock import causal_cone_mask
-from monsoon.shocks_spec import build_monsoon_stall, build_warm_ocean
+from monsoon.shocks_spec import box_mask, build_monsoon_stall, build_warm_ocean
 from monsoon.windows import deduplicate_windows, select_heldout_windows
 
 
@@ -151,6 +151,7 @@ def main() -> None:
     }
 
     # Precompute 10-step model-space rollouts once per window & shock
+    arab_bm = box_mask(8.0, 20.0, 65.0, 75.0)
     precomp: list[dict[str, Any]] = []
     with torch.inference_mode():
         for w in wins:
@@ -172,11 +173,15 @@ def main() -> None:
                 anom_ctrl, ev_ctrl, doy_last, steps, postproc_cfg=sim.postproc_cfg, ctx=sim.ctx
             ).astype(np.float32)
 
+            u_box = init[-1, 2][arab_bm]
+            v_box = init[-1, 3][arab_bm]
             entry: dict[str, Any] = {
                 "doy_last": doy_last,
                 "anom_ctrl": anom_ctrl,
                 "ev_ctrl": ev_ctrl,
                 "control": control,
+                "box_wind_mag": float(np.mean(np.hypot(u_box, v_box))),
+                "box_abs_u10": float(np.mean(np.abs(u_box))),
                 "shocks": {},
             }
             for sname, spec in shocks_spec.items():
@@ -196,6 +201,8 @@ def main() -> None:
 
     variants = ("V0", "V1", "V2", "V3")
     stats_std = np.asarray(json.loads((ROOT / "data" / "stats.json").read_text(encoding="utf-8"))["std"], dtype=np.float32)
+    med_box_wind = float(np.median([x["box_wind_mag"] for x in precomp]))
+    med_box_u10 = float(np.median([x["box_abs_u10"] for x in precomp]))
     print("\n=== VARIANT COMPARISON (CONES ON, 10-STEP ROLLOUT, N={} UNIQUE WINDOWS) ===".format(len(wins)))
     for sname, spec in shocks_spec.items():
         r1_box = spec["r1_box"]
@@ -203,8 +210,8 @@ def main() -> None:
         schs = spec["shocked_chs"]
         print(f"\n--- Shock: {sname} (shocked channels: {[channels[c] for c in schs]}) ---")
         header = (
-            f"{'Var':<3} | {'fin':>5} {'nz':>5} {'loc':>5} {'prop':>6} {'ntel':>5} {'stab':>5} {'all':>6}"
-            f" | {'c1%':>5} {'c2%':>5} {'stat%':>5} | {'R_min':>6} {'R_p10':>6} {'R_med':>6} | {'max|z|':>6} | "
+            f"{'Var':<3} | {'fin':>5} {'nz':>5} {'loc':>5} {'ntel':>5} {'stab':>5} {'prop':>6} {'all':>6}"
+            f" | {'R_p05':>6} {'R_med':>6} | {'max|z|':>6} | {'d8_E_med':>8} | "
             + " ".join(f"d8_{channels[c]}" for c in schs)
         )
         print(header)
@@ -213,9 +220,8 @@ def main() -> None:
         for var in variants:
             checks = []
             checks_stats = []
-            c1_list = []
-            c2_list = []
             r_vals = []
+            d8_energies = []
             max_z = 0.0
             d8_ch_max = {c: [] for c in schs}
             d8_ch_rms = {c: [] for c in schs}
@@ -243,11 +249,10 @@ def main() -> None:
                 z = np.abs(d / std[None, :, None, None])
                 max_z = max(max_z, float(np.max(z)))
                 e = r1_scoring._energy(d, std)
+                d8_energies.append(float(e[7].sum()))
                 out_e = np.array([e[k][~near].sum() for k in range(steps)], dtype=np.float64)
                 late = float(out_e[3:8].mean())
                 emax = float(e.sum(axis=(1, 2)).max())
-                c1_list.append(bool(late > 1.5 * float(out_e[0]) + 1e-12))
-                c2_list.append(bool(late > 0.02 * max(emax, 1e-12)))
                 r_vals.append(late / (0.02 * max(emax, 1e-12)))
 
                 for c in schs:
@@ -267,26 +272,27 @@ def main() -> None:
                     ]
                 )
             )
-            stats_pass = 100.0 * float(
-                np.mean(
-                    [
-                        bool(c["finite"] and c["nonzero"] and c["localized"] and c["propagates"] and c["stable"])
-                        for c in checks_stats
-                    ]
-                )
-            )
-            c1_pct = 100.0 * float(np.mean(c1_list))
-            c2_pct = 100.0 * float(np.mean(c2_list))
             d8_str = " ".join(
                 f"{np.median(d8_ch_max[c]):.3f}({np.median(d8_ch_rms[c]):.3f})" for c in schs
             )
+            flags = [k for k in ("localized", "no_teleport", "stable") if rates[k] < 100.0]
+            flag_str = f" [FLAG <100%: {flags}]" if flags else ""
             print(
                 f"{var:<3} | {rates['finite']:5.1f} {rates['nonzero']:5.1f} {rates['localized']:5.1f} "
-                f"{rates['propagates']:6.1f} {rates['no_teleport']:5.1f} {rates['stable']:5.1f} {all_pass:6.1f}"
-                f" | {c1_pct:5.1f} {c2_pct:5.1f} {stats_pass:5.1f}"
-                f" | {np.min(r_arr):6.3f} {np.percentile(r_arr, 10):6.3f} {np.median(r_arr):6.3f}"
-                f" | {max_z:6.4f} | {d8_str}"
+                f"{rates['no_teleport']:5.1f} {rates['stable']:5.1f} {rates['propagates']:6.1f} {all_pass:6.1f}"
+                f" | {np.percentile(r_arr, 5):6.3f} {np.median(r_arr):6.3f}"
+                f" | {max_z:6.4f} | {np.median(d8_energies):8.3f} | {d8_str}{flag_str}"
             )
+            if sname == "monsoon_stall" and var == "V1":
+                fail_idx = [i for i, c in enumerate(checks) if not c["propagates"]]
+                n_fail = len(fail_idx)
+                below_w = sum(1 for i in fail_idx if precomp[i]["box_wind_mag"] < med_box_wind)
+                below_u = sum(1 for i in fail_idx if precomp[i]["box_abs_u10"] < med_box_u10)
+                print(
+                    f"    [V1 stall fails={n_fail}/96] box-mean |wind| < all-window median ({med_box_wind:.3f} m/s): "
+                    f"{below_w}/{n_fail} ({100.0 * below_w / max(n_fail, 1):.1f}%); "
+                    f"box-mean |u10| < median ({med_box_u10:.3f} m/s): {below_u}/{n_fail} ({100.0 * below_u / max(n_fail, 1):.1f}%)"
+                )
 
 
 if __name__ == "__main__":
