@@ -163,13 +163,9 @@ def _build_climatology_init(doy: int) -> tuple[np.ndarray, list[int]]:
     harm_k = BUNDLE["harm_k"]
 
     init_days = [((doy - 1 - offset) % period) + 1 for offset in (2, 1, 0)]
-    frames = []
-    for d in init_days:
-        sc = sincos_from_doy(d, period=period)
-        y_mod = evaluate(harm_coef, sc, K=harm_k)
-        phys = from_model_space(y_mod)
-        frames.append(phys)
-    arr = np.stack(frames, axis=0).astype(np.float32)
+    doy_frac = np.asarray(init_days, dtype=np.float64) / float(period)
+    y_mod = evaluate(harm_coef, doy_frac, K=harm_k)
+    arr = from_model_space(y_mod).astype(np.float32)
     arr[:, 1] = np.maximum(arr[:, 1], 0.0)
     return arr, init_days
 
