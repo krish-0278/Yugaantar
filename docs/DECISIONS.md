@@ -97,6 +97,39 @@
   - **HTTP judge rehearsal (`127.0.0.1:8000`):** All 8 calls valid (`0` NaN/Inf, `min_tp = 0.0`, `t2m in [-25.28, +37.08] C`); control max wall `0.131 s`; shocked wall `0.147 s` (`warm_ocean`) and `0.162 s` (`monsoon_stall`); null call bitwise equal (`max|diff|/std = 0.0`). On Windows `localhost` DNS hits IPv6 `::1` (`~2.00 s` fallback to IPv4 `0.0.0.0:8000`) before IPv4 round-trip (`~0.11–0.16 s`).
   - **Benchmarks (`20 x 10-step`):** `threads=4` control `p50=0.118 s / max=0.164 s`, shocked `p50=0.159 s / max=0.173 s`; `threads=1` control `p50=0.138 s / max=0.157 s`, shocked `p50=0.216 s / max=0.219 s`.
 
+## Phase 4c — Pre-Declared Physical Transport Operator (`shock-transport` Branch)
+
+- **Pre-evaluation design & locked parameters (declared prior to implementation testing or any `causality_checks` evaluation):**
+  - Branch: `shock-transport` (branched from `2cf1e78`). Flag: `use_transport: bool = False` (default off until gate passes; old `V1` path preserved unchanged; control forecast path bit-for-bit unchanged; null shock returns `control_served` before entering the transport operator).
+  - Operator placement: applied per channel `c` and lead day `k = 1..steps` to the `V1` unshrunk dynamical response `resp_k = (pert_nb - ctrl_nb)[k-1]` **before** the causal cone (`cone_speed = 3.0`, `taper = 1.5`) and hard cap (`cap_sigma = 4.0`).
+  - **1. Advection:** Daily horizontal winds `(u10_j, v10_j)` from `control_served` (`j = 1..steps`) smoothed spatially per day with a `5 x 5` box average (`scipy.ndimage.uniform_filter(..., size=5, mode="nearest")`), converted to cells/day via fixed factor `86400.0 / 111000.0` (grid orientation `south -> north` in `i`, `west -> east` in `j`), clipped per day to isotropic speed `hypot(du_j, dv_j) <= 2.5` cells/day, summed cumulatively over `j <= k` to `(dx_k, dy_k)`, and applied as a per-channel backward bilinear shift (`scipy.ndimage.map_coordinates` at `(i - dy_k, j - dx_k)`, `order=1`, `prefilter=False`, `mode="constant"`, `cval=0.0`).
+  - **2. Diffusion:** Per-channel isotropic 2D Gaussian blur (`scipy.ndimage.gaussian_filter(..., sigma=sqrt(2 * D * k), mode="reflect")`) with pre-declared primary diffusivity **`D = 1.0` cell²/day** (~`1.4e5 m²/s` mesoscale diffusivity). Sensitivity-only values pre-declared for reporting: `D = 0.5` and `D = 2.0` cell²/day (no parameter tuning against checker pass rates).
+  - **3. Energy guard:** Assert per lead day `k` that `_energy(T(resp_v1)[k-1], std).sum() <= _energy(resp_v1[k-1], std).sum()` (non-amplifying; never rescale upward). Initial naive backward pull amplified energy under coastal wind convergence (`E_out=15.56 > E_in=15.23`); fixed the advection operator per Design rule #4 using Schur column-pull normalization (scaling each source pixel pull weight by `1 / max(1, col_sum)` so row and column sums of the bilinear shift matrix are both `<= 1`, guaranteeing `||T||_2 <= 1` unconditionally without upward rescaling).
+  - **Adoption gate:** Merge only if on the `96` de-duplicated windows: (1) `monsoon_stall propagates` improves by `>= +25` percentage points over `V1` (`>= 65.6%`) AND `warm_ocean propagates >= 95%`; (2) `localized`, `no_teleport`, `stable` stay `100%` for both shocks, `max |resp|/std <= 4`, and min day-1 energy within 3 cells `>= 0.80`; (3) all physical sanity tests pass and shocked 4-thread HTTP wall time `< 2 s`. Otherwise reject, record numbers, and delete `shock-transport`.
+
+- **Measured Task B, C, and D results (`96` de-duplicated windows, `V1` vs `V1+T`):**
+
+  | Shock | Setting | `loc` | `prop` | `ntel` | `stab` | `all` | `d1_c3` | `R_min` | `R_p10` | `R_med` | `max\|z\|` | Day-8 shocked ch (`max(rms)`) |
+  |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+  | `warm_ocean` | `V1` (base) | 100.0 | **99.0** | 100.0 | 100.0 | 99.0 | 1.000 | 0.931 | 1.947 | 4.921 | 4.0000 | `t2m` `0.092(0.022)`, `tcwv` `0.512(0.102)` |
+  | `warm_ocean` | `V1+T D=1.0` (primary) | 100.0 | **53.1** | 100.0 | 100.0 | 53.1 | 1.000 | 0.079 | 0.397 | 1.081 | 4.0000 | `t2m` `0.014(0.004)`, `tcwv` `0.060(0.019)` |
+  | `warm_ocean` | `V1+T D=0.5` (sens.) | 100.0 | 63.5 | 100.0 | 100.0 | 63.5 | 1.000 | 0.082 | 0.520 | 1.238 | 4.0000 | `t2m` `0.021(0.005)`, `tcwv` `0.086(0.022)` |
+  | `warm_ocean` | `V1+T D=2.0` (sens.) | 100.0 | 52.1 | 100.0 | 100.0 | 52.1 | 1.000 | 0.092 | 0.307 | 1.058 | 4.0000 | `t2m` `0.009(0.003)`, `tcwv` `0.042(0.016)` |
+  | `monsoon_stall` | `V1` (base) | 100.0 | **40.6** | 100.0 | 100.0 | 40.6 | 1.000 | 0.019 | 0.039 | 0.447 | 4.0000 | `u10` `0.189(0.021)`, `v10` `0.227(0.024)` |
+  | `monsoon_stall` | `V1+T D=1.0` (primary) | 100.0 | **12.5** | 100.0 | 100.0 | 12.5 | 1.000 | 0.000 | 0.001 | 0.042 | 1.7492 | `u10` `0.003(0.001)`, `v10` `0.003(0.001)` |
+  | `monsoon_stall` | `V1+T D=0.5` (sens.) | 100.0 | 24.0 | 100.0 | 100.0 | 24.0 | 1.000 | 0.000 | 0.001 | 0.051 | 1.8108 | `u10` `0.005(0.001)`, `v10` `0.005(0.001)` |
+  | `monsoon_stall` | `V1+T D=2.0` (sens.) | 100.0 | 3.1 | 100.0 | 100.0 | 3.1 | 1.000 | 0.000 | 0.001 | 0.042 | 1.6271 | `u10` `0.002(0.001)`, `v10` `0.002(0.001)` |
+
+  - **`monsoon_stall` stratified by box `mean|u10|` (`<3` / `3..5` / `>=5 m/s`):**
+    - `V1`: `8/53 (15.1%)` / `13/21 (61.9%)` / `18/22 (81.8%)`
+    - `V1+T D=1.0`: `0/53 (0.0%)` / `3/21 (14.3%)` / `9/22 (40.9%)`
+    - `V1+T D=0.5` (sens.): `0/53 (0.0%)` / `4/21 (19.0%)` / `19/22 (86.4%)`; `D=2.0` (sens.): `0/53 (0.0%)` / `1/21 (4.8%)` / `2/22 (9.1%)`.
+  - **Task C sanity & Task D timing:** Zero-shock, diffusion integral conservation (`rel_err < 1e-3`), no sign flips, energy guard (`max E_T/E_V1 = 0.7303 warm_ocean, 0.7276 monsoon_stall, 0 failures`), and 5-window control equality (`np.array_equal` vs pre-4c) all passed, while front radius jump `<= 8` failed on `26/96` `monsoon_stall` windows (max jump `15`). 4-thread HTTP shocked wall time (`127.0.0.1`): `warm_ocean p50=0.169 s / max=0.181 s`, `monsoon_stall p50=0.166 s / max=0.210 s`.
+- **Outcome: REJECTED — deleted branch `shock-transport` and kept `V1` on `main`.**
+  - **Why:** Gaussian diffusion (`sigma_k = sqrt(2*D*k)`) preserves linear integral but attenuates squared L2 perturbation energy density at days 4–8 relative to day-1 peak box energy (`R_med`: `4.921 -> 1.081` on `warm_ocean`, `0.447 -> 0.042` on `monsoon_stall`), failing Gate 1 (`warm_ocean 53.1% < 95%`, `monsoon_stall 12.5% < 65.6%`) and Gate 3 (`26/96` stall windows exceed front-jump `<= 8`).
+
+
+
 
 
 
