@@ -343,12 +343,12 @@
     el.cbValMid.textContent = formatNum((vmin + vmax) * 0.5, 1);
     el.cbValMax.textContent = formatNum(vmax, 1);
 
-    if (state.runData.max_abs_diff === 0 || state.runData.preset === "null") {
+    if (state.runData.max_abs_diff === 0) {
       el.cbDiffMin.textContent = "0";
       el.cbDiffMax.textContent = "0";
       el.nullCaption.classList.remove("hidden");
       el.nullCaption.textContent = `difference = 0 exactly (max |Δ| = ${state.runData.max_abs_diff.toFixed(1)})`;
-      el.diffCorner.textContent = "max |Δ| = 0.0";
+      el.diffCorner.textContent = `max |Δ| = ${state.runData.max_abs_diff.toFixed(1)}`;
     } else {
       el.cbDiffMin.textContent = `-${formatNum(dAbs, 2)}`;
       el.cbDiffMax.textContent = `+${formatNum(dAbs, 2)}`;
@@ -432,9 +432,20 @@
     const endX = xOf(lastIdx) + 5;
     let yEndP = yOf(allP[lastIdx]);
     let yEndM = yOf(allM[lastIdx]);
-    if (Math.abs(yEndP - yEndM) < 11) {
-      yEndP -= 5;
-      yEndM += 6;
+    if (Math.abs(yEndP - yEndM) < 12) {
+      if (yEndM >= yEndP) {
+        yEndM = yEndP + 12;
+        if (yEndM > H - mB - 2) {
+          yEndM = H - mB - 2;
+          yEndP = yEndM - 12;
+        }
+      } else {
+        yEndM = yEndP - 12;
+        if (yEndM < mT + 8) {
+          yEndM = mT + 8;
+          yEndP = yEndM + 12;
+        }
+      }
     }
     out += `<text x="${endX.toFixed(1)}" y="${(yEndP + 3).toFixed(1)}" fill="${INK}" font-size="10">Prime</text>`;
     out += `<text x="${endX.toFixed(1)}" y="${(yEndM + 3).toFixed(1)}" fill="${SHOCK}" font-size="10">Multiverse</text>`;
@@ -625,7 +636,11 @@
 
       state.runData = data;
       state.dayIdx = clamp(state.dayIdx, 0, data.steps - 1);
-      el.timingReadout.textContent = `inf ${data.inference_ms.total.toFixed(0)} ms · wall ${data.wall_ms.toFixed(0)} ms`;
+      const inf = data.inference_ms || {};
+      const ctrlText = Number.isFinite(inf.control) ? `${Math.round(inf.control)} ms` : "-";
+      const shockText = Number.isFinite(inf.shocked) ? `${Math.round(inf.shocked)} ms` : "-";
+      const wallText = Number.isFinite(data.wall_ms) ? `${(data.wall_ms / 1000).toFixed(1)} s` : "-";
+      el.timingReadout.textContent = `control ${ctrlText} · shocked ${shockText} · wall ${wallText}`;
       renderPertSummary();
       renderMapsAndColorbars();
       renderTimeseries();
