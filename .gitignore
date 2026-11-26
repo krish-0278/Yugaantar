@@ -1,0 +1,11 @@
+data/
+Data/
+*.nc
+*.whl
+runs/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+docs/BUILD_GUIDE.md
+docs/R1_CONTRACT.md

@@ -1,0 +1,106 @@
+{
+  "seed": 0,
+  "split": {
+    "train": 0.82,
+    "val": 0.09,
+    "test": 0.09
+  },
+  "grid": {
+    "height": 32,
+    "width": 36,
+    "lat_min": 6.5,
+    "lat_max": 37.5,
+    "lon_min": 65.5,
+    "lon_max": 100.5
+  },
+  "channels": ["t2m", "tp", "u10", "v10", "msl", "tcwv"],
+  "climatology": {
+    "harmonics_k": 4,
+    "doy_period": 365,
+    "ridge": 0.001,
+    "empirical_smooth_window": 15
+  },
+  "model": {
+    "cin": 34,
+    "cout": 6,
+    "channels": 96,
+    "n_blocks": 2,
+    "expansion": 2,
+    "max_step_radius": 3
+  },
+  "norm": {
+    "sigma_floor_median_frac": 0.25,
+    "anomaly_clip": 8.0,
+    "rollout_anom_clamp": 5.0
+  },
+  "stage_a": {
+    "lr": 0.002,
+    "weight_decay": 0.0001,
+    "batch_size": 32,
+    "epochs": 25,
+    "grad_clip": 1.0,
+    "ema_decay": 0.999,
+    "input_noise_sigma": 0.03,
+    "huber_delta": 1.0,
+    "tp_tail_weight": 3.0,
+    "bce_weight": 0.2,
+    "bce_pos_weight_max": 3.0,
+    "grad_loss_weight": 0.05,
+    "overfit_samples": 64,
+    "overfit_steps": 400,
+    "num_workers": 0
+  },
+  "stage_b": {
+    "curriculum": [
+      {"K": 2, "epochs": 3},
+      {"K": 4, "epochs": 4},
+      {"K": 8, "epochs": 4}
+    ],
+    "subsample_frac": 0.5,
+    "lr": 0.0005,
+    "weight_decay": 0.0001,
+    "batch_size": 32,
+    "grad_clip": 1.0,
+    "ema_decay": 0.999,
+    "input_noise_sigma": 0.03,
+    "anom_clamp": 5.0,
+    "max_k8_epoch_secs": 360.0,
+    "num_workers": 0,
+    "raw_lead8_min_skill": -0.15
+  },
+  "postproc": {
+    "fit_steps": 10,
+    "beta_clip": [0.0, 1.2],
+    "beta_tail_tau": 10.0,
+    "qm_lam_candidates": [0.0, 0.25, 0.5, 0.75, 1.0],
+    "pattern_gain_grid": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8],
+    "tp_var_ratio_target": 0.45,
+    "non_rain_var_ratio_floor": 0.5,
+    "var_restore_cap": 1.3,
+    "event_fit_leads": [1, 4, 8],
+    "event_high_mm": 10.5,
+    "event_low_mm": 9.5,
+    "clamp_margin_frac": 0.05,
+    "t2m_min_k": 233.15,
+    "t2m_max_k": 333.0
+  },
+  "shock": {
+    "causal_cone_r1": 3.0,
+    "causal_cone_step_growth": 1.5,
+    "causal_cone_max_growth": 8.0,
+    "cap_sigma": 4.0,
+    "zero_eps": 1e-9
+  },
+  "metrics": {
+    "rain_threshold_mm": 10.0,
+    "lead_days": [1, 4, 8],
+    "blur_min_ratio": 0.4,
+    "blur_max_ratio": 2.5
+  },
+  "windows": {
+    "n_in": 3,
+    "n_out": 10,
+    "per_category": 10,
+    "min_separation_days": 13
+  }
+}
