@@ -34,12 +34,17 @@
   };
 
   const el = {
+    modelNameChip: document.getElementById("modelNameChip"),
     healthDot: document.getElementById("healthDot"),
     healthText: document.getElementById("healthText"),
     timingReadout: document.getElementById("timingReadout"),
     runBtn: document.getElementById("runBtn"),
+    tryWarmBayBtn: document.getElementById("tryWarmBayBtn"),
+    emptyState: document.getElementById("emptyState"),
+    resultsView: document.getElementById("resultsView"),
     progressBar: document.getElementById("progressBar"),
     initSourceBadge: document.getElementById("initSourceBadge"),
+    shockHeaderBadge: document.getElementById("shockHeaderBadge"),
     historyTabBtn: document.getElementById("historyTabBtn"),
     initClimatologyPane: document.getElementById("initClimatologyPane"),
     initUploadPane: document.getElementById("initUploadPane"),
@@ -286,6 +291,44 @@
     el.overlayPrime.innerHTML = svgInner;
     el.overlayMulti.innerHTML = svgInner;
     el.overlayDiff.innerHTML = svgInner;
+  }
+
+  function renderPresetMiniMaps() {
+    if (!cachedCoastPath) return;
+    document.querySelectorAll("[data-mini-preset]").forEach((svg) => {
+      const id = svg.dataset.miniPreset;
+      let mark = "";
+      if (id === "warm_bay_of_bengal") {
+        // 8-20 N (i=2..14 -> yTop=32-15=17..29), 82-94 E (j=16.5..28.5)
+        mark = `<rect x="16.5" y="17.5" width="12" height="12" fill="${SHOCK}" fill-opacity="0.22" stroke="${SHOCK}" stroke-width="0.9"/>`;
+      } else if (id === "weaker_arabian_sea_wind") {
+        // 8-20 N, 65-75 E (j=0..9.5)
+        mark = `<rect x="0.5" y="17.5" width="9.5" height="12" fill="${SHOCK}" fill-opacity="0.22" stroke="${SHOCK}" stroke-width="0.9"/>`;
+      } else if (id === "custom") {
+        mark = `<circle cx="20" cy="21" r="4" fill="${SHOCK}" fill-opacity="0.18" stroke="${SHOCK}" stroke-width="0.9" stroke-dasharray="1.5 1"/>`;
+      }
+      svg.innerHTML =
+        `<path d="${cachedCoastPath}" fill="none" stroke="${INK}" stroke-width="0.45" stroke-opacity="0.8"/>` +
+        mark;
+    });
+  }
+
+  function selectPreset(presetId) {
+    state.preset = presetId;
+    document.querySelectorAll("input[name='preset']").forEach((r) => {
+      r.checked = r.value === presetId;
+    });
+    document.querySelectorAll("[data-preset-card]").forEach((card) => {
+      card.classList.toggle("selected", card.dataset.presetCard === presetId);
+    });
+    if (el.shockHeaderBadge) el.shockHeaderBadge.textContent = presetId;
+    el.customControls.classList.toggle("hidden", presetId !== "custom");
+    document.querySelectorAll(".map-stage").forEach((s) => s.classList.toggle("pick-mode", presetId === "custom"));
+    if (state.meta) {
+      const found = state.meta.presets.find((p) => p.id === presetId);
+      if (found) el.presetDesc.textContent = found.summary;
+    }
+    renderMapOverlays();
   }
 
   function renderMapsAndColorbars() {
@@ -569,23 +612,26 @@
     try {
       const res = await fetch("/api/health");
       const data = await res.json();
+      if (data.model && data.model.model_name && el.modelNameChip) {
+        el.modelNameChip.textContent = data.model.model_name;
+      }
       const ready = data.model_reachable && data.model && data.model.status === "ready";
       el.healthDot.classList.remove("ready", "warn");
       if (ready) {
         el.healthDot.classList.add("ready");
-        el.healthText.textContent = "model ready";
+        el.healthText.textContent = "ready";
       } else if (data.model_reachable) {
         el.healthDot.classList.add("warn");
-        el.healthText.textContent = "model loading";
+        el.healthText.textContent = "loading";
       } else {
         el.healthDot.classList.add("warn");
-        el.healthText.textContent = "model offline";
+        el.healthText.textContent = "unreachable";
       }
       return ready;
     } catch {
       el.healthDot.classList.remove("ready");
       el.healthDot.classList.add("warn");
-      el.healthText.textContent = "server offline";
+      el.healthText.textContent = "unreachable";
       return false;
     }
   }
@@ -635,6 +681,8 @@
       }
 
       state.runData = data;
+      if (el.emptyState) el.emptyState.classList.add("hidden");
+      if (el.resultsView) el.resultsView.classList.remove("hidden");
       state.dayIdx = clamp(state.dayIdx, 0, data.steps - 1);
       const inf = data.inference_ms || {};
       const ctrlText = Number.isFinite(inf.control) ? `${Math.round(inf.control)} ms` : "-";
@@ -695,6 +743,12 @@
 
   function bindEvents() {
     el.runBtn.addEventListener("click", runExperiment);
+    if (el.tryWarmBayBtn) {
+      el.tryWarmBayBtn.addEventListener("click", () => {
+        selectPreset("warm_bay_of_bengal");
+        runExperiment();
+      });
+    }
 
     document.querySelectorAll("[data-init-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -782,14 +836,7 @@
 
     document.querySelectorAll("input[name='preset']").forEach((radio) => {
       radio.addEventListener("change", () => {
-        state.preset = radio.value;
-        el.customControls.classList.toggle("hidden", state.preset !== "custom");
-        document.querySelectorAll(".map-stage").forEach((s) => s.classList.toggle("pick-mode", state.preset === "custom"));
-        if (state.meta) {
-          const found = state.meta.presets.find((p) => p.id === state.preset);
-          if (found) el.presetDesc.textContent = found.summary;
-        }
-        renderMapOverlays();
+        selectPreset(radio.value);
       });
     });
 
@@ -900,15 +947,14 @@
         el.historyTabBtn.title = "History dataset not available";
       }
       renderMapOverlays();
+      renderPresetMiniMaps();
     } catch {
       showError("Failed to load /api/meta from dashboard server.");
     }
 
     const ready = await refreshHealth();
-    if (ready) {
-      runExperiment();
-    } else {
-      showError("Model server offline — start serve.py on port 8000, then click Run Experiment.");
+    if (!ready) {
+      showError("Model server unreachable — start serve.py on port 8000, then click Run Experiment.");
     }
   }
 
