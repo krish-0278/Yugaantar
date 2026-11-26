@@ -764,6 +764,71 @@ input[type="range"] {
   color: var(--shock);
 }
 
+.drop-zone {
+  border: 1px dashed var(--rule);
+  border-radius: 2px;
+  background: var(--paper);
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.sr-only-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.history-runs-wrap {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--rule);
+}
+
+.run-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.run-history-item {
+  text-align: left;
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper);
+  padding: 4px 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.run-history-item:hover {
+  border-color: var(--ink);
+}
+
+.run-history-item.active {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.export-group {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: 4px;
+}
+
 .map-overlay {
   position: absolute;
   inset: 0;

@@ -52,8 +52,11 @@
           </div>
 
           <div id="initUploadPane" class="init-pane hidden">
-            <label class="file-label" for="uploadFileInput">Choose .npz or .json [3, 6, 32, 36]</label>
-            <input id="uploadFileInput" type="file" accept=".npz,.json" aria-label="Upload initial state file">
+            <div id="uploadDropZone" class="drop-zone" tabindex="0" role="button" aria-label="Drop .npz or .json initial state file or click to browse">
+              <span class="small-note">Drop <code>.npz</code> or <code>.json</code> <code>[3, 6, 32, 36]</code> here</span>
+              <button id="uploadBrowseBtn" type="button" class="btn-mini">Choose file</button>
+              <input id="uploadFileInput" type="file" accept=".npz,.json" class="sr-only-file" aria-label="Upload initial state file">
+            </div>
             <div id="uploadStatus" class="mono small-note muted-text">No file uploaded.</div>
           </div>
 
@@ -223,6 +226,12 @@
 
           <div id="pertSummary" class="mono small-note muted-text">Run experiment to inspect applied box delta.</div>
           <div id="errorBanner" class="error-banner hidden" role="alert"></div>
+          <div class="history-runs-wrap">
+            <div class="small-note muted-text">Recent runs (in memory, max 5)</div>
+            <div id="runHistoryList" class="run-history-list">
+              <span class="small-note muted-text">No runs yet.</span>
+            </div>
+          </div>
         </div>
       </details>
     </aside>
@@ -267,6 +276,11 @@
             <datalist id="dayTicks"></datalist>
             <button id="nextDayBtn" type="button" class="btn-mini mono" title="Next day (Right arrow)" aria-label="Next day">&gt;</button>
             <span id="dayReadout" class="mono day-readout">Day 1 / 10 (DOY 167)</span>
+            <div class="export-group" role="group" aria-label="Download outputs">
+              <button id="downloadPngBtn" type="button" class="btn-mini mono" title="Download 3-panel map PNG">PNG</button>
+              <button id="downloadCsvBtn" type="button" class="btn-mini mono" title="Download time-series CSV">CSV</button>
+              <button id="downloadJsonBtn" type="button" class="btn-mini mono" title="Download impact JSON">JSON</button>
+            </div>
           </div>
         </div>
 

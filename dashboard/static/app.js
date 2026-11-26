@@ -37,6 +37,8 @@
     chartHoverIdx: null,
     crosshair: null,
     toastTimer: null,
+    runHistory: [],
+    activeRunId: null,
     runData: null,
     running: false,
     abortCtrl: null
@@ -59,8 +61,14 @@
     initUploadPane: document.getElementById("initUploadPane"),
     initHistoryPane: document.getElementById("initHistoryPane"),
     doyInput: document.getElementById("doyInput"),
+    uploadDropZone: document.getElementById("uploadDropZone"),
+    uploadBrowseBtn: document.getElementById("uploadBrowseBtn"),
     uploadFileInput: document.getElementById("uploadFileInput"),
     uploadStatus: document.getElementById("uploadStatus"),
+    runHistoryList: document.getElementById("runHistoryList"),
+    downloadPngBtn: document.getElementById("downloadPngBtn"),
+    downloadCsvBtn: document.getElementById("downloadCsvBtn"),
+    downloadJsonBtn: document.getElementById("downloadJsonBtn"),
     historyIndexInput: document.getElementById("historyIndexInput"),
     loadHistoryBtn: document.getElementById("loadHistoryBtn"),
     historyStatus: document.getElementById("historyStatus"),
@@ -896,6 +904,195 @@
     }
   }
 
+  function syncHashFromState() {
+    const ch = state.channels[state.chIdx] ? state.channels[state.chIdx].key : "t2m";
+    const dayNum = state.dayIdx + 1;
+    const h = `#preset=${encodeURIComponent(state.preset)}&doy=${state.doy}&steps=${state.steps}&channel=${encodeURIComponent(ch)}&day=${dayNum}`;
+    if (window.location.hash !== h) {
+      history.replaceState(null, "", h);
+    }
+  }
+
+  function applyHashOnInit() {
+    const raw = (window.location.hash || "").replace(/^#/, "");
+    if (!raw) return;
+    const params = new URLSearchParams(raw);
+    const preset = params.get("preset");
+    if (preset && ["warm_bay_of_bengal", "weaker_arabian_sea_wind", "null", "custom"].includes(preset)) {
+      selectPreset(preset);
+    }
+    const doy = parseInt(params.get("doy") || "", 10);
+    if (Number.isFinite(doy) && doy >= 1 && doy <= 365) {
+      state.doy = doy;
+      el.doyInput.value = String(doy);
+    }
+    const steps = parseInt(params.get("steps") || "", 10);
+    if (Number.isFinite(steps) && steps >= 1 && steps <= 30) {
+      state.steps = steps;
+      el.stepsRange.value = String(steps);
+      el.stepsInput.value = String(steps);
+    }
+    const chParam = params.get("channel");
+    if (chParam) {
+      const idx = state.channels.findIndex((c) => c.key === chParam);
+      if (idx >= 0) {
+        state.chIdx = idx;
+        document.querySelectorAll("[data-ch]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.ch, 10) === idx));
+      }
+    }
+    const dayParam = parseInt(params.get("day") || "", 10);
+    if (Number.isFinite(dayParam) && dayParam >= 1) {
+      state.dayIdx = clamp(dayParam - 1, 0, state.steps - 1);
+    }
+  }
+
+  function triggerDownloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function downloadMapPng() {
+    if (!state.runData) return;
+    const ch = state.channels[state.chIdx];
+    const k = state.dayIdx;
+    const pad = 12;
+    const cellW = 216;
+    const cellH = 192;
+    const headH = 26;
+    const totalW = pad * 4 + cellW * 3;
+    const totalH = pad * 2 + headH + cellH;
+    const out = document.createElement("canvas");
+    out.width = totalW;
+    out.height = totalH;
+    const ctx = out.getContext("2d");
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, totalW, totalH);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = INK;
+    ctx.font = "12px monospace";
+    const panels = [
+      { label: `Prime (${ch.short}, d${k + 1})`, canvas: el.canvasPrime },
+      { label: `Multiverse (${ch.short}, d${k + 1})`, canvas: el.canvasMulti },
+      { label: `Difference (${ch.short}, d${k + 1})`, canvas: el.canvasDiff }
+    ];
+    panels.forEach((p, idx) => {
+      const x = pad + idx * (cellW + pad);
+      ctx.fillText(p.label, x, pad + 14);
+      ctx.drawImage(p.canvas, x, pad + headH, cellW, cellH);
+      ctx.strokeStyle = RULE;
+      ctx.strokeRect(x, pad + headH, cellW, cellH);
+    });
+    out.toBlob((blob) => {
+      if (blob) triggerDownloadBlob(blob, `monsoon_${state.runData.preset}_${ch.key}_d${k + 1}.png`);
+    }, "image/png");
+  }
+
+  function downloadTimeseriesCsv() {
+    if (!state.runData || !state.runData.timeseries) return;
+    const ch = state.channels[state.chIdx];
+    const ts = state.runData.timeseries;
+    const lines = ["day,doy,channel,unit,all_prime,all_multiverse,land_prime,land_multiverse"];
+    for (let s = 0; s < state.runData.steps; s++) {
+      lines.push([
+        s + 1,
+        rolloutDoy(state.runData.doy, s),
+        ch.key,
+        ch.unit,
+        ts.all[ch.key].prime[s],
+        ts.all[ch.key].multiverse[s],
+        ts.land[ch.key].prime[s],
+        ts.land[ch.key].multiverse[s]
+      ].join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    triggerDownloadBlob(blob, `monsoon_timeseries_${state.runData.preset}_${ch.key}.csv`);
+  }
+
+  function downloadImpactJson() {
+    if (!state.runData || !state.runData.impact) return;
+    const payload = {
+      preset: state.runData.preset,
+      doy: state.runData.doy,
+      steps: state.runData.steps,
+      max_abs_diff: state.runData.max_abs_diff,
+      impact: state.runData.impact
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    triggerDownloadBlob(blob, `monsoon_impact_${state.runData.preset}_doy${state.runData.doy}.json`);
+  }
+
+  function renderRunHistory() {
+    if (!el.runHistoryList) return;
+    if (state.runHistory.length === 0) {
+      el.runHistoryList.innerHTML = `<span class="small-note muted-text">No runs yet.</span>`;
+      return;
+    }
+    el.runHistoryList.innerHTML = state.runHistory
+      .map((item) => {
+        const active = item.id === state.activeRunId ? " active" : "";
+        return `<button type="button" class="run-history-item mono${active}" data-run-id="${item.id}">${item.label}</button>`;
+      })
+      .join("");
+    el.runHistoryList.querySelectorAll("[data-run-id]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const found = state.runHistory.find((r) => String(r.id) === btn.dataset.runId);
+        if (found) loadRunFromHistory(found);
+      });
+    });
+  }
+
+  function recordRunInHistory(data) {
+    const id = Date.now() + Math.random();
+    const label = `${data.preset} · DOY ${data.doy} · ${data.steps}d`;
+    state.runHistory.unshift({
+      id,
+      label,
+      preset: data.preset,
+      doy: data.doy,
+      steps: data.steps,
+      data
+    });
+    if (state.runHistory.length > 5) state.runHistory.length = 5;
+    state.activeRunId = id;
+    renderRunHistory();
+  }
+
+  function displayRunData(data) {
+    state.runData = data;
+    if (el.emptyState) el.emptyState.classList.add("hidden");
+    if (el.resultsView) el.resultsView.classList.remove("hidden");
+    state.dayIdx = clamp(state.dayIdx, 0, data.steps - 1);
+    const inf = data.inference_ms || {};
+    const ctrlText = Number.isFinite(inf.control) ? `${Math.round(inf.control)} ms` : "-";
+    const shockText = Number.isFinite(inf.shocked) ? `${Math.round(inf.shocked)} ms` : "-";
+    const wallText = Number.isFinite(data.wall_ms) ? `${(data.wall_ms / 1000).toFixed(1)} s` : "-";
+    el.timingReadout.textContent = `control ${ctrlText} · shocked ${shockText} · wall ${wallText}`;
+    renderPertSummary();
+    renderMapsAndColorbars();
+    renderTimeseries();
+    renderImpacts();
+    syncHashFromState();
+  }
+
+  function loadRunFromHistory(entry) {
+    stopPlayback();
+    state.activeRunId = entry.id;
+    state.doy = entry.doy;
+    state.steps = entry.steps;
+    el.doyInput.value = String(entry.doy);
+    el.stepsRange.value = String(entry.steps);
+    el.stepsInput.value = String(entry.steps);
+    selectPreset(entry.preset);
+    displayRunData(entry.data);
+    renderRunHistory();
+  }
+
   async function runExperiment() {
     if (!validateCustomShock()) {
       showError("Fix custom shock limits before running.");
@@ -934,19 +1131,8 @@
         throw new Error(data.error || `Request failed (${res.status})`);
       }
 
-      state.runData = data;
-      if (el.emptyState) el.emptyState.classList.add("hidden");
-      if (el.resultsView) el.resultsView.classList.remove("hidden");
-      state.dayIdx = clamp(state.dayIdx, 0, data.steps - 1);
-      const inf = data.inference_ms || {};
-      const ctrlText = Number.isFinite(inf.control) ? `${Math.round(inf.control)} ms` : "-";
-      const shockText = Number.isFinite(inf.shocked) ? `${Math.round(inf.shocked)} ms` : "-";
-      const wallText = Number.isFinite(data.wall_ms) ? `${(data.wall_ms / 1000).toFixed(1)} s` : "-";
-      el.timingReadout.textContent = `control ${ctrlText} · shocked ${shockText} · wall ${wallText}`;
-      renderPertSummary();
-      renderMapsAndColorbars();
-      renderTimeseries();
-      renderImpacts();
+      recordRunInHistory(data);
+      displayRunData(data);
       await refreshHealth();
     } catch (err) {
       if (err.name === "AbortError") {
@@ -1041,14 +1227,26 @@
       });
     });
 
-    el.uploadFileInput.addEventListener("change", async () => {
-      const file = el.uploadFileInput.files && el.uploadFileInput.files[0];
+    const handleUploadFile = async (file) => {
       if (!file) return;
       showError("");
-      el.uploadStatus.textContent = `Uploading ${file.name}…`;
+      el.uploadStatus.textContent = `Checking ${file.name}…`;
       try {
         const buf = await file.arrayBuffer();
         const isJson = file.name.toLowerCase().endsWith(".json");
+        if (isJson) {
+          const parsed = JSON.parse(new TextDecoder().decode(buf));
+          const arr = Array.isArray(parsed) ? parsed : parsed && parsed.init_states;
+          const validShape =
+            Array.isArray(arr) &&
+            arr.length === 3 &&
+            Array.isArray(arr[0]) && arr[0].length === 6 &&
+            Array.isArray(arr[0][0]) && arr[0][0].length === 32 &&
+            Array.isArray(arr[0][0][0]) && arr[0][0][0].length === 36;
+          if (!validShape) {
+            throw new Error(`Invalid shape in ${file.name}: expected [3, 6, 32, 36].`);
+          }
+        }
         const res = await fetch("/api/init/upload", {
           method: "POST",
           headers: { "Content-Type": isJson ? "application/json" : "application/octet-stream" },
@@ -1062,13 +1260,52 @@
           state.doy = data.doy;
           el.doyInput.value = String(data.doy);
         }
-        el.uploadStatus.textContent = `Loaded ${file.name}`;
+        el.uploadStatus.textContent = `${file.name} · valid [3, 6, 32, 36]`;
         el.initSourceBadge.textContent = data.label;
       } catch (err) {
-        el.uploadStatus.textContent = "Upload error";
+        el.uploadStatus.textContent = `${file.name} · invalid`;
         showError(err.message);
       }
+    };
+
+    el.uploadFileInput.addEventListener("change", () => {
+      const file = el.uploadFileInput.files && el.uploadFileInput.files[0];
+      handleUploadFile(file);
     });
+
+    if (el.uploadBrowseBtn) {
+      el.uploadBrowseBtn.addEventListener("click", (evt) => {
+        evt.stopPropagation();
+        el.uploadFileInput.click();
+      });
+    }
+
+    if (el.uploadDropZone) {
+      el.uploadDropZone.addEventListener("click", () => el.uploadFileInput.click());
+      el.uploadDropZone.addEventListener("keydown", (evt) => {
+        if (evt.key === "Enter" || evt.key === " ") {
+          evt.preventDefault();
+          el.uploadFileInput.click();
+        }
+      });
+      el.uploadDropZone.addEventListener("dragover", (evt) => {
+        evt.preventDefault();
+        el.uploadDropZone.classList.add("drag-over");
+      });
+      el.uploadDropZone.addEventListener("dragleave", () => {
+        el.uploadDropZone.classList.remove("drag-over");
+      });
+      el.uploadDropZone.addEventListener("drop", (evt) => {
+        evt.preventDefault();
+        el.uploadDropZone.classList.remove("drag-over");
+        const file = evt.dataTransfer && evt.dataTransfer.files && evt.dataTransfer.files[0];
+        handleUploadFile(file);
+      });
+    }
+
+    if (el.downloadPngBtn) el.downloadPngBtn.addEventListener("click", downloadMapPng);
+    if (el.downloadCsvBtn) el.downloadCsvBtn.addEventListener("click", downloadTimeseriesCsv);
+    if (el.downloadJsonBtn) el.downloadJsonBtn.addEventListener("click", downloadImpactJson);
 
     el.loadHistoryBtn.addEventListener("click", async () => {
       showError("");
@@ -1194,6 +1431,7 @@
         document.querySelectorAll("[data-ch]").forEach((b) => b.classList.toggle("active", b === btn));
         renderMapsAndColorbars();
         renderTimeseries();
+        syncHashFromState();
       });
     });
 
@@ -1402,6 +1640,7 @@
       state.meta = await metaRes.json();
       if (state.meta.channels) state.channels = state.meta.channels;
       syncCustomChannelBounds();
+      applyHashOnInit();
       updateDrawReadout();
       if (!state.meta.history_available) {
         el.historyTabBtn.disabled = true;
