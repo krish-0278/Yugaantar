@@ -451,6 +451,39 @@ input[type="range"] {
   justify-content: space-between;
   align-items: center;
   margin-top: 6px;
+  margin-bottom: 4px;
+}
+
+.draw-readout {
+  margin-bottom: 4px;
+  padding: 3px 5px;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+}
+
+.effects-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.eff-row {
+  display: grid;
+  grid-template-columns: 78px 1fr 56px;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.eff-row input[type="range"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.num-eff {
+  width: 56px !important;
+  padding: 2px 4px !important;
 }
 
 .run-actions {

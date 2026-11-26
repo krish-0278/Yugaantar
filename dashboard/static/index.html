@@ -119,41 +119,86 @@
           </div>
 
           <div id="customControls" class="custom-box hidden">
-            <div class="small-note accent-text">Click any map to place center, or enter coordinates:</div>
+            <div class="effects-header">
+              <span class="small-note accent-text">Drag on any map to draw shock</span>
+              <div class="inline-pair">
+                <button id="undoShockBtn" type="button" class="btn-mini" title="Undo last shock change" disabled>Undo</button>
+                <button id="clearCustomBtn" type="button" class="btn-mini" title="Reset custom shock">Reset</button>
+              </div>
+            </div>
+
+            <div id="drawReadout" class="mono small-note muted-text draw-readout">16.5°N 85.5°E · r=3.0 cells (~28 cells)</div>
+
             <div class="two-col-grid">
               <label class="mini-field">
                 <span>Lat (°N)</span>
-                <input id="customLat" type="number" min="6.5" max="37.5" step="0.5" value="16.5" class="mono">
+                <input id="customLat" type="number" min="6.5" max="37.5" step="0.5" value="16.5" class="mono" aria-label="Custom shock latitude">
               </label>
               <label class="mini-field">
                 <span>Lon (°E)</span>
-                <input id="customLon" type="number" min="65.5" max="100.5" step="0.5" value="85.5" class="mono">
-              </label>
-              <label class="mini-field">
-                <span>Radius (cells)</span>
-                <input id="customRadius" type="number" min="0.5" max="12.0" step="0.5" value="3.0" class="mono">
+                <input id="customLon" type="number" min="65.5" max="100.5" step="0.5" value="85.5" class="mono" aria-label="Custom shock longitude">
               </label>
               <div class="mini-field">
+                <span>Shape</span>
+                <div class="seg-group compact" role="group" aria-label="Draw shape">
+                  <button type="button" class="seg-btn active" data-draw-shape="circle">circle</button>
+                  <button type="button" class="seg-btn" data-draw-shape="rect">rect</button>
+                </div>
+              </div>
+              <div class="mini-field">
                 <span>Falloff</span>
-                <div class="seg-group compact">
+                <div class="seg-group compact" role="group" aria-label="Shock falloff">
                   <button type="button" class="seg-btn active" data-falloff="smooth">smooth</button>
                   <button type="button" class="seg-btn" data-falloff="flat">flat</button>
                 </div>
               </div>
             </div>
 
+            <div class="field-row">
+              <label for="customRadius">Radius (cells)</label>
+              <div class="inline-pair">
+                <input id="customRadiusRange" type="range" min="0.5" max="12.0" step="0.5" value="3.0" aria-label="Radius slider">
+                <input id="customRadius" type="number" min="0.5" max="12.0" step="0.5" value="3.0" class="mono num-sm" aria-label="Radius in cells">
+              </div>
+            </div>
+
             <div class="effects-header">
-              <span class="small-note muted-text">Physical deltas at center</span>
-              <button id="clearCustomBtn" type="button" class="btn-mini">Reset</button>
+              <span class="small-note muted-text">Magnitude at center</span>
             </div>
-            <div class="two-col-grid effects-grid">
-              <label class="mini-field"><span>t2m (K)</span><input id="eff_t2m" type="number" step="0.5" value="3.0" class="mono"></label>
-              <label class="mini-field"><span>tp (mm/d)</span><input id="eff_tp" type="number" step="0.5" value="0" class="mono"></label>
-              <label class="mini-field"><span>u10 (m/s)</span><input id="eff_u10" type="number" step="0.5" value="0" class="mono"></label>
-              <label class="mini-field"><span>v10 (m/s)</span><input id="eff_v10" type="number" step="0.5" value="0" class="mono"></label>
-              <label class="mini-field"><span>msl (Pa)</span><input id="eff_msl" type="number" step="50" value="0" class="mono"></label>
-              <label class="mini-field"><span>tcwv (kg/m²)</span><input id="eff_tcwv" type="number" step="1.0" value="4.0" class="mono"></label>
+            <div class="effects-sliders">
+              <div class="eff-row">
+                <label for="eff_t2m">t2m (K)</label>
+                <input id="eff_range_t2m" type="range" min="-8" max="8" step="0.5" value="3.0" aria-label="t2m delta slider">
+                <input id="eff_t2m" type="number" step="0.5" value="3.0" class="mono num-eff" aria-label="t2m delta">
+              </div>
+              <div class="eff-row">
+                <label for="eff_tp">tp (mm/d)</label>
+                <input id="eff_range_tp" type="range" min="-20" max="20" step="0.5" value="0" aria-label="tp delta slider">
+                <input id="eff_tp" type="number" step="0.5" value="0" class="mono num-eff" aria-label="tp delta">
+              </div>
+              <div class="eff-row">
+                <label for="eff_u10">u10 (m/s)</label>
+                <input id="eff_range_u10" type="range" min="-10" max="10" step="0.5" value="0" aria-label="u10 delta slider">
+                <input id="eff_u10" type="number" step="0.5" value="0" class="mono num-eff" aria-label="u10 delta">
+              </div>
+              <div class="eff-row">
+                <label for="eff_v10">v10 (m/s)</label>
+                <input id="eff_range_v10" type="range" min="-10" max="10" step="0.5" value="0" aria-label="v10 delta slider">
+                <input id="eff_v10" type="number" step="0.5" value="0" class="mono num-eff" aria-label="v10 delta">
+              </div>
+              <div class="eff-row">
+                <label for="eff_msl">msl (Pa)</label>
+                <input id="eff_range_msl" type="range" min="-1200" max="1200" step="50" value="0" aria-label="msl delta slider">
+                <input id="eff_msl" type="number" step="50" value="0" class="mono num-eff" aria-label="msl delta">
+              </div>
+              <div class="eff-row">
+                <label for="eff_tcwv">tcwv (kg/m²)</label>
+                <input id="eff_range_tcwv" type="range" min="-20" max="20" step="1.0" value="4.0" aria-label="tcwv delta slider">
+                <input id="eff_tcwv" type="number" step="1.0" value="4.0" class="mono num-eff" aria-label="tcwv delta">
+              </div>
             </div>
+
+            <div id="customValidationError" class="error-banner hidden" role="alert"></div>
           </div>
         </div>
       </details>

@@ -24,6 +24,10 @@
     steps: 10,
     preset: "warm_bay_of_bengal",
     falloff: "smooth",
+    drawShape: "circle",
+    hoverGrid: null,
+    dragDraw: null,
+    shockStack: [],
     chIdx: 0,
     dayIdx: 0,
     playing: false,
@@ -62,7 +66,19 @@
     customLat: document.getElementById("customLat"),
     customLon: document.getElementById("customLon"),
     customRadius: document.getElementById("customRadius"),
+    customRadiusRange: document.getElementById("customRadiusRange"),
+    drawReadout: document.getElementById("drawReadout"),
+    customValidationError: document.getElementById("customValidationError"),
+    undoShockBtn: document.getElementById("undoShockBtn"),
     clearCustomBtn: document.getElementById("clearCustomBtn"),
+    effRanges: {
+      t2m: document.getElementById("eff_range_t2m"),
+      tp: document.getElementById("eff_range_tp"),
+      u10: document.getElementById("eff_range_u10"),
+      v10: document.getElementById("eff_range_v10"),
+      msl: document.getElementById("eff_range_msl"),
+      tcwv: document.getElementById("eff_range_tcwv")
+    },
     effInputs: {
       t2m: document.getElementById("eff_t2m"),
       tp: document.getElementById("eff_tp"),
@@ -264,6 +280,7 @@
 
     let shockPath = "";
     let customMarker = "";
+    let ghostMarker = "";
 
     if (state.preset === "custom") {
       const clat = parseFloat(el.customLat.value);
@@ -272,9 +289,41 @@
       if (Number.isFinite(clat) && Number.isFinite(clon) && Number.isFinite(rad)) {
         const cx = clon - 65.5 + 0.5;
         const cy = 32 - (clat - 6.5 + 0.5);
-        customMarker =
-          `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${rad.toFixed(2)}" fill="none" stroke="${SHOCK}" stroke-width="0.28" stroke-dasharray="0.6 0.4"/>` +
-          `<path d="M${(cx - 0.6).toFixed(2)} ${cy.toFixed(2)}H${(cx + 0.6).toFixed(2)}M${cx.toFixed(2)} ${(cy - 0.6).toFixed(2)}V${(cy + 0.6).toFixed(2)}" stroke="${SHOCK}" stroke-width="0.28"/>`;
+        if (state.drawShape === "rect") {
+          const side = Math.max(1, rad * 2);
+          customMarker =
+            `<rect x="${(cx - rad).toFixed(2)}" y="${(cy - rad).toFixed(2)}" width="${side.toFixed(2)}" height="${side.toFixed(2)}" fill="none" stroke="${SHOCK}" stroke-width="0.28" stroke-dasharray="0.6 0.4"/>` +
+            `<path d="M${(cx - 0.6).toFixed(2)} ${cy.toFixed(2)}H${(cx + 0.6).toFixed(2)}M${cx.toFixed(2)} ${(cy - 0.6).toFixed(2)}V${(cy + 0.6).toFixed(2)}" stroke="${SHOCK}" stroke-width="0.28"/>`;
+        } else {
+          customMarker =
+            `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${rad.toFixed(2)}" fill="none" stroke="${SHOCK}" stroke-width="0.28" stroke-dasharray="0.6 0.4"/>` +
+            `<path d="M${(cx - 0.6).toFixed(2)} ${cy.toFixed(2)}H${(cx + 0.6).toFixed(2)}M${cx.toFixed(2)} ${(cy - 0.6).toFixed(2)}V${(cy + 0.6).toFixed(2)}" stroke="${SHOCK}" stroke-width="0.28"/>`;
+        }
+      }
+
+      if (state.dragDraw) {
+        const { startLat, startLon, curLat, curLon } = state.dragDraw;
+        if (state.drawShape === "rect") {
+          const x0 = Math.min(startLon, curLon) - 65.5 + 0.5;
+          const x1 = Math.max(startLon, curLon) - 65.5 + 0.5;
+          const y0 = 32 - (Math.max(startLat, curLat) - 6.5 + 0.5);
+          const y1 = 32 - (Math.min(startLat, curLat) - 6.5 + 0.5);
+          ghostMarker = `<rect x="${x0.toFixed(2)}" y="${y0.toFixed(2)}" width="${Math.max(0.5, x1 - x0).toFixed(2)}" height="${Math.max(0.5, y1 - y0).toFixed(2)}" fill="${SHOCK}" fill-opacity="0.14" stroke="${SHOCK}" stroke-width="0.32"/>`;
+        } else {
+          const cx = startLon - 65.5 + 0.5;
+          const cy = 32 - (startLat - 6.5 + 0.5);
+          const r = clamp(Math.hypot(curLat - startLat, curLon - startLon), 0.5, getLimits().max_radius_cells);
+          ghostMarker = `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${r.toFixed(2)}" fill="${SHOCK}" fill-opacity="0.14" stroke="${SHOCK}" stroke-width="0.32"/>`;
+        }
+      } else if (state.hoverGrid && Number.isFinite(rad)) {
+        const cx = state.hoverGrid.lon - 65.5 + 0.5;
+        const cy = 32 - (state.hoverGrid.lat - 6.5 + 0.5);
+        if (state.drawShape === "rect") {
+          const side = Math.max(1, rad * 2);
+          ghostMarker = `<rect x="${(cx - rad).toFixed(2)}" y="${(cy - rad).toFixed(2)}" width="${side.toFixed(2)}" height="${side.toFixed(2)}" fill="none" stroke="${ACCENT}" stroke-width="0.24" stroke-dasharray="0.4 0.4" stroke-opacity="0.75"/>`;
+        } else {
+          ghostMarker = `<circle cx="${cx.toFixed(2)}" cy="${cy.toFixed(2)}" r="${rad.toFixed(2)}" fill="none" stroke="${ACCENT}" stroke-width="0.24" stroke-dasharray="0.4 0.4" stroke-opacity="0.75"/>`;
+        }
       }
     } else if (state.runData && state.runData.region_mask && state.runData.preset === state.preset) {
       const p = buildContourPath(state.runData.region_mask);
@@ -286,7 +335,8 @@
     const svgInner =
       `<path d="${cachedCoastPath}" fill="none" stroke="${INK}" stroke-width="0.16" stroke-opacity="0.85"/>` +
       shockPath +
-      customMarker;
+      customMarker +
+      ghostMarker;
 
     el.overlayPrime.innerHTML = svgInner;
     el.overlayMulti.innerHTML = svgInner;
@@ -311,6 +361,129 @@
         `<path d="${cachedCoastPath}" fill="none" stroke="${INK}" stroke-width="0.45" stroke-opacity="0.8"/>` +
         mark;
     });
+  }
+
+  function getLimits() {
+    const lim = (state.meta && state.meta.limits) || {};
+    return {
+      min_steps: lim.min_steps ?? 1,
+      max_steps: lim.max_steps ?? 30,
+      min_doy: lim.min_doy ?? 1,
+      max_doy: lim.max_doy ?? 365,
+      min_radius_cells: lim.min_radius_cells ?? 0.5,
+      max_radius_cells: lim.max_radius_cells ?? 12.0
+    };
+  }
+
+  function snapshotShock() {
+    const eff = {};
+    for (const [k, inp] of Object.entries(el.effInputs)) {
+      eff[k] = inp.value;
+    }
+    return {
+      preset: state.preset,
+      lat: el.customLat.value,
+      lon: el.customLon.value,
+      radius: el.customRadius.value,
+      falloff: state.falloff,
+      drawShape: state.drawShape,
+      eff
+    };
+  }
+
+  function pushShockSnapshot() {
+    state.shockStack.push(snapshotShock());
+    if (state.shockStack.length > 20) state.shockStack.shift();
+    if (el.undoShockBtn) el.undoShockBtn.disabled = state.shockStack.length === 0;
+  }
+
+  function restoreShockSnapshot(snap) {
+    if (!snap) return;
+    el.customLat.value = snap.lat;
+    el.customLon.value = snap.lon;
+    el.customRadius.value = snap.radius;
+    if (el.customRadiusRange) el.customRadiusRange.value = snap.radius;
+    state.falloff = snap.falloff;
+    state.drawShape = snap.drawShape || "circle";
+    document.querySelectorAll("[data-falloff]").forEach((b) => b.classList.toggle("active", b.dataset.falloff === state.falloff));
+    document.querySelectorAll("[data-draw-shape]").forEach((b) => b.classList.toggle("active", b.dataset.drawShape === state.drawShape));
+    for (const [k, v] of Object.entries(snap.eff)) {
+      if (el.effInputs[k]) el.effInputs[k].value = v;
+      if (el.effRanges[k]) el.effRanges[k].value = v;
+    }
+    selectPreset(snap.preset);
+    validateCustomShock();
+    updateDrawReadout();
+  }
+
+  function updateDrawReadout(customLat, customLon, customRad) {
+    if (!el.drawReadout) return;
+    const lat = Number.isFinite(customLat) ? customLat : parseFloat(el.customLat.value);
+    const lon = Number.isFinite(customLon) ? customLon : parseFloat(el.customLon.value);
+    const rad = Number.isFinite(customRad) ? customRad : parseFloat(el.customRadius.value);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(rad)) return;
+    const approxCells = Math.max(1, Math.round(Math.PI * rad * rad));
+    el.drawReadout.textContent = `${lat.toFixed(1)}°N ${lon.toFixed(1)}°E · r=${rad.toFixed(1)} cells (~${approxCells} cells)`;
+  }
+
+  function validateCustomShock() {
+    if (!el.customValidationError) return true;
+    if (state.preset !== "custom") {
+      el.customValidationError.classList.add("hidden");
+      el.customValidationError.textContent = "";
+      return true;
+    }
+    const lim = getLimits();
+    const lat = parseFloat(el.customLat.value);
+    const lon = parseFloat(el.customLon.value);
+    const rad = parseFloat(el.customRadius.value);
+    let errMsg = "";
+    if (!Number.isFinite(lat) || lat < 6.5 || lat > 37.5) {
+      errMsg = "Center latitude must be between 6.5 and 37.5 °N.";
+    } else if (!Number.isFinite(lon) || lon < 65.5 || lon > 100.5) {
+      errMsg = "Center longitude must be between 65.5 and 100.5 °E.";
+    } else if (!Number.isFinite(rad) || rad < lim.min_radius_cells || rad > lim.max_radius_cells) {
+      errMsg = `Radius must be between ${lim.min_radius_cells} and ${lim.max_radius_cells} cells.`;
+    } else {
+      for (const ch of state.channels) {
+        const inp = el.effInputs[ch.key];
+        if (!inp) continue;
+        const v = parseFloat(inp.value);
+        if (!Number.isFinite(v)) {
+          errMsg = `${ch.short} magnitude must be a number.`;
+          break;
+        }
+        if (ch.std) {
+          const maxMag = 4.0 * ch.std;
+          if (Math.abs(v) > maxMag) {
+            errMsg = `${ch.short} delta must be within ±${formatNum(maxMag, 2)} ${ch.unit} (4σ limit).`;
+            break;
+          }
+        }
+      }
+    }
+    if (errMsg) {
+      el.customValidationError.textContent = errMsg;
+      el.customValidationError.classList.remove("hidden");
+      return false;
+    }
+    el.customValidationError.classList.add("hidden");
+    el.customValidationError.textContent = "";
+    return true;
+  }
+
+  function syncCustomChannelBounds() {
+    if (!state.meta || !state.meta.channels) return;
+    for (const ch of state.meta.channels) {
+      const range = el.effRanges[ch.key];
+      const num = el.effInputs[ch.key];
+      if (!range || !num || !ch.std) continue;
+      const maxMag = Number((4.0 * ch.std).toFixed(2));
+      range.min = String(-maxMag);
+      range.max = String(maxMag);
+      num.min = String(-maxMag);
+      num.max = String(maxMag);
+    }
   }
 
   function selectPreset(presetId) {
@@ -650,6 +823,10 @@
   }
 
   async function runExperiment() {
+    if (!validateCustomShock()) {
+      showError("Fix custom shock limits before running.");
+      return;
+    }
     if (state.running && state.abortCtrl) {
       state.abortCtrl.abort();
     }
@@ -836,27 +1013,93 @@
 
     document.querySelectorAll("input[name='preset']").forEach((radio) => {
       radio.addEventListener("change", () => {
+        pushShockSnapshot();
         selectPreset(radio.value);
+        validateCustomShock();
+      });
+    });
+
+    document.querySelectorAll("[data-draw-shape]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.drawShape = btn.dataset.drawShape;
+        document.querySelectorAll("[data-draw-shape]").forEach((b) => b.classList.toggle("active", b === btn));
+        renderMapOverlays();
       });
     });
 
     document.querySelectorAll("[data-falloff]").forEach((btn) => {
       btn.addEventListener("click", () => {
+        pushShockSnapshot();
         state.falloff = btn.dataset.falloff;
         document.querySelectorAll("[data-falloff]").forEach((b) => b.classList.toggle("active", b === btn));
       });
     });
 
-    [el.customLat, el.customLon, el.customRadius].forEach((inp) => {
-      inp.addEventListener("input", renderMapOverlays);
+    if (el.customRadiusRange) {
+      el.customRadiusRange.addEventListener("input", () => {
+        el.customRadius.value = el.customRadiusRange.value;
+        validateCustomShock();
+        updateDrawReadout();
+        renderMapOverlays();
+      });
+    }
+
+    el.customRadius.addEventListener("input", () => {
+      if (el.customRadiusRange) el.customRadiusRange.value = el.customRadius.value;
+      validateCustomShock();
+      updateDrawReadout();
+      renderMapOverlays();
     });
 
+    [el.customLat, el.customLon].forEach((inp) => {
+      inp.addEventListener("input", () => {
+        validateCustomShock();
+        updateDrawReadout();
+        renderMapOverlays();
+      });
+    });
+
+    for (const [key, range] of Object.entries(el.effRanges)) {
+      const num = el.effInputs[key];
+      if (!range || !num) continue;
+      range.addEventListener("input", () => {
+        num.value = range.value;
+        validateCustomShock();
+      });
+      num.addEventListener("input", () => {
+        range.value = num.value;
+        validateCustomShock();
+      });
+    }
+
+    if (el.undoShockBtn) {
+      el.undoShockBtn.addEventListener("click", () => {
+        if (state.shockStack.length === 0) return;
+        const prev = state.shockStack.pop();
+        restoreShockSnapshot(prev);
+        el.undoShockBtn.disabled = state.shockStack.length === 0;
+      });
+    }
+
     el.clearCustomBtn.addEventListener("click", () => {
+      pushShockSnapshot();
+      el.customLat.value = "16.5";
+      el.customLon.value = "85.5";
+      el.customRadius.value = "3.0";
+      if (el.customRadiusRange) el.customRadiusRange.value = "3.0";
       Object.values(el.effInputs).forEach((inp) => {
         inp.value = "0";
       });
+      Object.values(el.effRanges).forEach((inp) => {
+        if (inp) inp.value = "0";
+      });
       el.effInputs.t2m.value = "3.0";
+      if (el.effRanges.t2m) el.effRanges.t2m.value = "3.0";
       el.effInputs.tcwv.value = "4.0";
+      if (el.effRanges.tcwv) el.effRanges.tcwv.value = "4.0";
+      validateCustomShock();
+      updateDrawReadout();
+      renderMapOverlays();
     });
 
     document.querySelectorAll("[data-ch]").forEach((btn) => {
@@ -889,9 +1132,40 @@
         return { i, j, lat: 6.5 + i, lon: 65.5 + j };
       };
 
+      frame.addEventListener("mousedown", (evt) => {
+        if (state.preset !== "custom" || evt.button !== 0) return;
+        evt.preventDefault();
+        const pt = getGridPoint(evt);
+        state.dragDraw = { startLat: pt.lat, startLon: pt.lon, curLat: pt.lat, curLon: pt.lon };
+        renderMapOverlays();
+      });
+
       frame.addEventListener("mousemove", (evt) => {
+        const pt = getGridPoint(evt);
+        if (state.preset === "custom") {
+          state.hoverGrid = pt;
+          if (state.dragDraw) {
+            state.dragDraw.curLat = pt.lat;
+            state.dragDraw.curLon = pt.lon;
+            const lim = getLimits();
+            if (state.drawShape === "rect") {
+              const midLat = Math.round((state.dragDraw.startLat + pt.lat)) * 0.5;
+              const midLon = Math.round((state.dragDraw.startLon + pt.lon)) * 0.5;
+              const halfSpan = Math.max(Math.abs(pt.lat - state.dragDraw.startLat), Math.abs(pt.lon - state.dragDraw.startLon)) * 0.5;
+              const r = clamp(Math.round(halfSpan * 2) * 0.5, lim.min_radius_cells, lim.max_radius_cells);
+              updateDrawReadout(midLat, midLon, r);
+            } else {
+              const dist = Math.hypot(pt.lat - state.dragDraw.startLat, pt.lon - state.dragDraw.startLon);
+              const r = clamp(Math.round(dist * 2) * 0.5, lim.min_radius_cells, lim.max_radius_cells);
+              updateDrawReadout(state.dragDraw.startLat, state.dragDraw.startLon, r);
+            }
+          } else {
+            updateDrawReadout(pt.lat, pt.lon);
+          }
+          renderMapOverlays();
+        }
         if (!state.runData) return;
-        const { i, j, lat, lon } = getGridPoint(evt);
+        const { i, j, lat, lon } = pt;
         const ch = state.channels[state.chIdx];
         const k = state.dayIdx;
         const pv = state.runData.control[k][state.chIdx][i][j];
@@ -910,15 +1184,41 @@
 
       frame.addEventListener("mouseleave", () => {
         el.mapTooltip.classList.add("hidden");
+        if (state.hoverGrid) {
+          state.hoverGrid = null;
+          if (!state.dragDraw) updateDrawReadout();
+          renderMapOverlays();
+        }
       });
+    });
 
-      frame.addEventListener("click", (evt) => {
-        if (state.preset !== "custom") return;
-        const { lat, lon } = getGridPoint(evt);
-        el.customLat.value = lat.toFixed(1);
-        el.customLon.value = lon.toFixed(1);
-        renderMapOverlays();
-      });
+    window.addEventListener("mouseup", () => {
+      if (!state.dragDraw) return;
+      const { startLat, startLon, curLat, curLon } = state.dragDraw;
+      state.dragDraw = null;
+      pushShockSnapshot();
+      const lim = getLimits();
+      let newLat = startLat;
+      let newLon = startLon;
+      let newRad = parseFloat(el.customRadius.value) || 3.0;
+      const dist = Math.hypot(curLat - startLat, curLon - startLon);
+      if (dist >= 0.5) {
+        if (state.drawShape === "rect") {
+          newLat = clamp(Math.round((startLat + curLat)) * 0.5, 6.5, 37.5);
+          newLon = clamp(Math.round((startLon + curLon)) * 0.5, 65.5, 100.5);
+          const halfSpan = Math.max(Math.abs(curLat - startLat), Math.abs(curLon - startLon)) * 0.5;
+          newRad = clamp(Math.round(halfSpan * 2) * 0.5, lim.min_radius_cells, lim.max_radius_cells);
+        } else {
+          newRad = clamp(Math.round(dist * 2) * 0.5, lim.min_radius_cells, lim.max_radius_cells);
+        }
+      }
+      el.customLat.value = newLat.toFixed(1);
+      el.customLon.value = newLon.toFixed(1);
+      el.customRadius.value = newRad.toFixed(1);
+      if (el.customRadiusRange) el.customRadiusRange.value = newRad.toFixed(1);
+      validateCustomShock();
+      updateDrawReadout();
+      renderMapOverlays();
     });
 
     window.addEventListener("keydown", (evt) => {
@@ -942,6 +1242,8 @@
       const metaRes = await fetch("/api/meta");
       state.meta = await metaRes.json();
       if (state.meta.channels) state.channels = state.meta.channels;
+      syncCustomChannelBounds();
+      updateDrawReadout();
       if (!state.meta.history_available) {
         el.historyTabBtn.disabled = true;
         el.historyTabBtn.title = "History dataset not available";
