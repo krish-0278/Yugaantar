@@ -41,6 +41,7 @@ def apply_shock_response(
     perturbation: np.ndarray,
     channel_std_phys: np.ndarray,
     *,
+    baseline_for_resp: np.ndarray | None = None,
     cone_speed: float = 3.0,
     taper: float = 1.5,
     cap_sigma: float = 4.0,
@@ -49,8 +50,9 @@ def apply_shock_response(
     use_cone: bool = True,
     use_cap: bool = True,
 ) -> np.ndarray:
-    """Apply causal-cone mask and response cap to physical shock response pert - control."""
-    resp = (pert - control).astype(np.float32, copy=True)
+    """Apply causal-cone mask and response cap to physical shock response pert - base_resp."""
+    base_resp = control if baseline_for_resp is None else baseline_for_resp
+    resp = (pert - base_resp).astype(np.float32, copy=True)
     if use_cone:
         mask = causal_cone_mask(perturbation, control.shape[0], cone_speed=cone_speed, taper=taper)
         resp = resp * mask[:, None, :, :]

@@ -65,6 +65,26 @@
   - Gate 4 (CSI > empirical clim): Lead 4 `0.3877 > 0.2848` (**PASS**), Lead 8 `0.3431 > 0.2995` (**PASS**).
   - Gate 5 (30-step stability across 300 rollouts): **PASS** (`0` NaN/Inf, `min_tp=0.0`, `t2m in [-32.81, +42.79] C`; `+-5` clamp hit rate `< 0.04%` across all 6 channels on the 200 noisy starts).
 
+## Phase 4 (Shocks) — Unshrunk Shock-Response Path (`V1`)
+
+- **Decision:** Adopt **`V1`** (`use_unshrunk_shock=True`, default ON, switchable to `V0` via flag) as the serving shock-response path, keeping `cone_speed=3.0`, `taper=1.5`, and `cap_sigma=4.0` unchanged.
+- **Why:** The served control forecast (`control_served`) retains output `beta` shrinkage as the minimum-error best estimate, whereas a prescribed physical shock's response is a deterministic dynamical perturbation rather than forecast uncertainty and should not be attenuated by output `beta` shrinkage. Forming `resp = pert_nb - control_nb` with `use_beta=False` on both dynamical rollouts before applying the causal cone and 4-sigma cap and adding to `control_served` dominates `V0` across both contract shocks while keeping `localized`, `no_teleport`, and `stable` at `100.0%` and `max |resp|/std <= 4.0`.
+- **Measured effect (`N = 96` de-duplicated held-out windows, 10-step kit `causality_checks`, cones ON):**
+
+  | Shock | Variant | `fin` | `nz` | `loc` | `prop` | `ntel` | `stab` | `all` | `R_min` | `R_p10` | `R_med` | `max\|z\|` | Day-8 shocked ch (`max(rms)`) |
+  |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+  | `warm_ocean` | `V0` | 100.0 | 100.0 | 100.0 | 72.9 | 100.0 | 100.0 | 72.9 | 0.299 | 0.584 | 1.614 | 4.0000 | `t2m` `0.044(0.010)`, `tcwv` `0.200(0.040)` |
+  | `warm_ocean` | **`V1`** | 100.0 | 100.0 | 100.0 | **99.0** | 100.0 | 100.0 | **99.0** | 0.931 | 1.947 | 4.921 | 4.0000 | `t2m` `0.092(0.022)`, `tcwv` `0.512(0.102)` |
+  | `warm_ocean` | `V2` | 100.0 | 100.0 | 100.0 | 92.7 | 100.0 | 100.0 | 92.7 | 0.536 | 1.212 | 4.124 | 4.0000 | `t2m` `0.092(0.022)`, `tcwv` `0.512(0.102)` |
+  | `warm_ocean` | `V3` | 100.0 | 100.0 | 100.0 | 94.8 | 100.0 | 100.0 | 94.8 | 0.666 | 1.530 | 4.494 | 3.9954 | `t2m` `0.092(0.022)`, `tcwv` `0.509(0.102)` |
+  | `monsoon_stall` | `V0` | 100.0 | 100.0 | 100.0 | 24.0 | 100.0 | 100.0 | 24.0 | 0.009 | 0.018 | 0.217 | 3.2448 | `u10` `0.106(0.012)`, `v10` `0.105(0.011)` |
+  | `monsoon_stall` | **`V1`** | 100.0 | 100.0 | 100.0 | **40.6** | 100.0 | 100.0 | **40.6** | 0.019 | 0.039 | 0.447 | 4.0000 | `u10` `0.189(0.021)`, `v10` `0.227(0.024)` |
+  | `monsoon_stall` | `V2` | 100.0 | 100.0 | 100.0 | 24.0 | 100.0 | 100.0 | 24.0 | 0.019 | 0.038 | 0.126 | 4.0000 | `u10` `0.189(0.021)`, `v10` `0.227(0.024)` |
+  | `monsoon_stall` | `V3` | 100.0 | 100.0 | 100.0 | 24.0 | 100.0 | 100.0 | 24.0 | 0.019 | 0.038 | 0.126 | 3.8427 | `u10` `0.188(0.021)`, `v10` `0.227(0.024)` |
+
+- **Known limitation:** `monsoon_stall` `propagates` remains at **`40.6%`** (`39/96`; `8/53` for box `mean|u10| < 3 m/s`, `13/21` for `3..5 m/s`, `18/22` for `>= 5 m/s`) because the frozen model's learned persistence factor `sigmoid(rho_logit)` is `~0.83–0.85/day` (`[0.8387, 0.8465, 0.8316, 0.8292, 0.8505, 0.8448]`), attenuating localized wind perturbations before outside energy exceeds `2%` of day-1 peak total energy in weak-wind windows.
+
+
 
 
 

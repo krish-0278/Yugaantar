@@ -31,9 +31,16 @@ def decode_doy_last(doy_sincos: np.ndarray | list[float] | tuple[float, float]) 
 class Simulator:
     """CPU-only inference simulator loading all weights and static fields once at startup."""
 
-    def __init__(self, root_dir: str | Path | None = None, num_threads: int = 4) -> None:
+    def __init__(
+        self,
+        root_dir: str | Path | None = None,
+        num_threads: int = 4,
+        *,
+        use_unshrunk_shock: bool = True,
+    ) -> None:
         self.root = Path(root_dir).resolve() if root_dir is not None else ROOT
         torch.set_num_threads(int(num_threads))
+        self.use_unshrunk_shock = bool(use_unshrunk_shock)
 
         with (self.root / "config" / "default.json").open("r", encoding="utf-8") as f:
             self.cfg: dict[str, Any] = json.load(f)
@@ -79,6 +86,7 @@ class Simulator:
         *,
         use_cone: bool = True,
         use_cap: bool = True,
+        use_unshrunk_shock: bool | None = None,
     ) -> np.ndarray:
         """Run deterministic rollout in physical units [steps, 6, 32, 36] float32."""
         init_arr = np.asarray(init_states, dtype=np.float32)
@@ -134,6 +142,43 @@ class Simulator:
                 anom_clamp=self.anom_clamp,
                 input_clip=self.input_clip,
             )
+
+            unshrunk = self.use_unshrunk_shock if use_unshrunk_shock is None else bool(use_unshrunk_shock)
+            if unshrunk:
+                # V1: shock response from dynamical core without beta shrinkage, added to served control.
+                ctrl_nb = apply_postproc(
+                    anom_ctrl,
+                    ev_ctrl,
+                    doy_last,
+                    steps_int,
+                    postproc_cfg=self.postproc_cfg,
+                    ctx=self.ctx,
+                    use_beta=False,
+                ).astype(np.float32)
+                pert_nb = apply_postproc(
+                    anom_pert,
+                    ev_pert,
+                    doy_last,
+                    steps_int,
+                    postproc_cfg=self.postproc_cfg,
+                    ctx=self.ctx,
+                    use_beta=False,
+                ).astype(np.float32)
+                return apply_shock_response(
+                    control,
+                    pert_nb,
+                    pert_arr,
+                    self.channel_std_phys,
+                    baseline_for_resp=ctrl_nb,
+                    cone_speed=self.cone_speed,
+                    taper=self.taper,
+                    cap_sigma=self.cap_sigma,
+                    t2m_min_k=self.t2m_min_k,
+                    t2m_max_k=self.t2m_max_k,
+                    use_cone=use_cone,
+                    use_cap=use_cap,
+                )
+
             pert = apply_postproc(
                 anom_pert,
                 ev_pert,

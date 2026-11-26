@@ -137,3 +137,15 @@ def select_heldout_windows(
         out_windows[split_name] = w
         out_shortfalls[split_name] = sf
     return out_windows, out_shortfalls
+
+
+def deduplicate_windows(windows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """De-duplicate windows sharing the same start index ``t_last``, preserving first-seen order."""
+    seen: set[int] = set()
+    unique: list[dict[str, Any]] = []
+    for w in windows:
+        t = int(w["t_last"])
+        if t not in seen:
+            seen.add(t)
+            unique.append(w)
+    return unique

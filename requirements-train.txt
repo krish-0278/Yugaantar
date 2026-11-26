@@ -3,3 +3,4 @@ matplotlib
 h5netcdf
 netCDF4
 pytest
+httpx
