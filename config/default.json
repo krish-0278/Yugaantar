@@ -88,7 +88,8 @@
     "cone_speed": 3.0,
     "taper": 1.5,
     "cap_sigma": 4.0,
-    "zero_eps": 1e-9
+    "zero_eps": 1e-9,
+    "use_unshrunk_shock": true
   },
   "metrics": {
     "rain_threshold_mm": 10.0,

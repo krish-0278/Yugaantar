@@ -36,11 +36,10 @@ class Simulator:
         root_dir: str | Path | None = None,
         num_threads: int = 4,
         *,
-        use_unshrunk_shock: bool = True,
+        use_unshrunk_shock: bool | None = None,
     ) -> None:
         self.root = Path(root_dir).resolve() if root_dir is not None else ROOT
         torch.set_num_threads(int(num_threads))
-        self.use_unshrunk_shock = bool(use_unshrunk_shock)
 
         with (self.root / "config" / "default.json").open("r", encoding="utf-8") as f:
             self.cfg: dict[str, Any] = json.load(f)
@@ -74,6 +73,8 @@ class Simulator:
         self.taper = float(shock_cfg["taper"])
         self.cap_sigma = float(shock_cfg["cap_sigma"])
         self.zero_eps = float(shock_cfg["zero_eps"])
+        default_unshrunk = bool(shock_cfg.get("use_unshrunk_shock", True))
+        self.use_unshrunk_shock = default_unshrunk if use_unshrunk_shock is None else bool(use_unshrunk_shock)
         self.t2m_min_k = float(self.postproc_cfg.get("t2m_min_k", 233.15))
         self.t2m_max_k = float(self.postproc_cfg.get("t2m_max_k", 333.0))
 
