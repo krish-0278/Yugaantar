@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 from monsoon.climatology import DEFAULT_PERIOD, evaluate as eval_harmonic, load_harmonics
-from monsoon.data import (
+from monsoon.transforms import (
     build_static_norm,
     from_model_space,
     load_norm,

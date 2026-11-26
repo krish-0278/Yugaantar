@@ -85,9 +85,8 @@
     "t2m_max_k": 333.0
   },
   "shock": {
-    "causal_cone_r1": 3.0,
-    "causal_cone_step_growth": 1.5,
-    "causal_cone_max_growth": 8.0,
+    "cone_speed": 3.0,
+    "taper": 1.5,
     "cap_sigma": 4.0,
     "zero_eps": 1e-9
   },
