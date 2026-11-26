@@ -545,7 +545,7 @@ input[type="range"] {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: 10px;
-  height: 222px;
+  height: 230px;
   flex-shrink: 0;
 }
 
@@ -553,7 +553,7 @@ input[type="range"] {
   background: var(--panel);
   border: 1px solid var(--rule);
   border-radius: 2px;
-  padding: 6px 10px;
+  padding: 5px 10px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -586,9 +586,10 @@ input[type="range"] {
 }
 
 .impact-table th, .impact-table td {
-  padding: 3px 4px;
+  padding: 2px 4px;
   border-bottom: 1px solid var(--rule);
   text-align: left;
+  line-height: 1.25;
 }
 
 .impact-table th {
@@ -612,10 +613,11 @@ input[type="range"] {
 
 .impact-notes {
   margin-top: auto;
-  padding-top: 4px;
+  padding-top: 3px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  line-height: 1.2;
 }
 
 /* Tooltip */
