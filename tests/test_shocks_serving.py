@@ -316,3 +316,8 @@ def test_shocks_across_96_windows_cone_on_and_off() -> None:
     assert summ_on["warm_ocean"]["kit_rates"]["propagates"] >= 0.95, (
         f"warm_ocean propagates {summ_on['warm_ocean']['kit_rates']['propagates']:.3f} < 0.95"
     )
+    # Known weak spot under weak Arabian Sea winds (not a pass criterion; waived in docs/DECISIONS.md).
+    # Keep only a 35% regression floor to detect accidental regressions in monsoon_stall propagation.
+    assert summ_on["monsoon_stall"]["kit_rates"]["propagates"] >= 0.35, (
+        f"monsoon_stall propagates {summ_on['monsoon_stall']['kit_rates']['propagates']:.3f} < 0.35"
+    )
