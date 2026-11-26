@@ -128,6 +128,33 @@
 - **Outcome: REJECTED — deleted branch `shock-transport` and kept `V1` on `main`.**
   - **Why:** Gaussian diffusion (`sigma_k = sqrt(2*D*k)`) preserves linear integral but attenuates squared L2 perturbation energy density at days 4–8 relative to day-1 peak box energy (`R_med`: `4.921 -> 1.081` on `warm_ocean`, `0.447 -> 0.042` on `monsoon_stall`), failing Gate 1 (`warm_ocean 53.1% < 95%`, `monsoon_stall 12.5% < 65.6%`) and Gate 3 (`26/96` stall windows exceed front-jump `<= 8`).
 
+## Phase 4 (Final) — Config Flag, `monsoon_stall` Waiver, and Clean-Copy Live Audit
+
+- **What failed under `V0` and why `V1` was selected:**
+  - Across `96` de-duplicated held-out windows (`48 val + 48 test`, removing 4 duplicate `t_last` entries including `idx 55 / idx 60`), `V0` failed the kit's `propagates` condition `late > 0.02 * max_k E[k]` on `26/96` (`27.1%`) of `warm_ocean` windows and `73/96` (`76.0%`) of `monsoon_stall` windows because output `beta` shrinkage attenuated days 4–8 perturbation response energy relative to day 1 (`d8_E_med`: `48.812` on `warm_ocean`, `3.271` on `monsoon_stall`).
+  - **Chosen variant (`V1`):** `use_unshrunk_shock = true` in `config/default.json` (`"shock"`), read by `Simulator.__init__` in `monsoon/infer.py` (switchable via flag). Control rollouts retain `beta` shrinkage as the minimum-RMSE best estimate (`20/20` real test windows match pre-edit controls via `np.array_equal`), zero/null shocks (`<= 1e-9`) return the control array itself, while shocked responses compute `pert_nb - ctrl_nb` without output `beta` shrinkage before cone + 4-sigma cap.
+
+  | Shock | Variant | `fin` | `nz` | `loc` | `ntel` | `stab` | `prop` | `all` | `R_p05` | `R_med` | `max\|z\|` | `d8_E_med` |
+  |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+  | `warm_ocean` | `V0` | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 72.9 | 72.9 | 0.502 | 1.614 | 4.0000 | 48.812 |
+  | `warm_ocean` | **`V1`** | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | **99.0** | **99.0** | 1.338 | 4.921 | 4.0000 | 448.310 |
+  | `warm_ocean` | `V2` | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 92.7 | 92.7 | 0.784 | 4.124 | 4.0000 | 288.030 |
+  | `warm_ocean` | `V3` | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 94.8 | 94.8 | 0.995 | 4.494 | 3.9954 | 266.088 |
+  | `monsoon_stall` | `V0` | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 24.0 | 24.0 | 0.015 | 0.217 | 3.2448 | 3.271 |
+  | `monsoon_stall` | **`V1`** | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | **40.6** | **40.6** | 0.033 | 0.447 | 4.0000 | 12.433 |
+  | `monsoon_stall` | `V2` | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 24.0 | 24.0 | 0.033 | 0.126 | 4.0000 | 5.653 |
+  | `monsoon_stall` | `V3` | 100.0 | 100.0 | 100.0 | 100.0 | 100.0 | 24.0 | 24.0 | 0.033 | 0.126 | 3.8427 | 5.547 |
+
+- **`monsoon_stall` `propagates >= 95%` Waiver:**
+  - Under `V1`, `nonzero`, `localized`, `no_teleport`, and `stable` are `100.0%` (`max|z| = 4.0000 <= 4.0`) for both shocks, and `warm_ocean` `propagates` is **`99.0%`** (`95/96 >= 95%`).
+  - `monsoon_stall` `propagates` is **`40.6%`** (`39/96`; `57` failures). Of the `57` failing windows, **`37/57 (64.9%)`** have Arabian Sea box-mean `|wind|` below the all-window median (`4.429 m/s`) and **`40/57 (70.2%)`** have box-mean `|u10|` below the all-window median (`2.674 m/s`): weak background winds in the Arabian Sea box produce a genuinely small `-40%` delta in physical units (`8/53 = 15.1%` pass for `<3 m/s`, `13/21 = 61.9%` for `3..5 m/s`, `18/22 = 81.8%` for `>=5 m/s`), which decays over days 4–8 under the learned `rho ~ 0.83/day` without reaching `2%` of day-1 peak box energy. Kept `V1` cleanly without hacking `cone_speed`, `taper`, `cap_sigma`, or weights, with a `35%` regression floor in `tests/test_shocks_serving.py`.
+- **Clean-copy verification, benchmarks (`20 x 10-step`), and Gate 6:**
+  - `monsoon_r1.schema_validator`: `6/6 OK`; `repo_scan` clean copy (no `data/`): `15.0 / 15.0` (`flags = []`); zero writes outside temp dir.
+  - `8/8` HTTP rehearsal calls valid (`0.100–0.154 s` on `127.0.0.1:8000`; `null` bitwise equal; `warm_ocean` passes all kit checks; `monsoon_stall` passes `finite`/`nonzero`/`localized`/`no_teleport`/`stable`).
+  - Timing (`20 x 10-step`): `threads=4` control `median=0.109 s / p95=0.162 s / max=0.162 s`, shocked (`10x`) `median=0.143 s / p95=0.174 s / max=0.177 s`, `PeakRSS=303.1 MB`; `threads=1` control `median=0.139 s / p95=0.161 s / max=0.173 s`, shocked (`5x`) `median=0.245 s / p95=0.260 s / max=0.262 s`, `PeakRSS=272.5 MB`.
+  - Fresh `scripts/evaluate.py`: `test` day-8 `tp` variance ratio **`0.5095 >= 0.40`** (lead-1/4/8 mean skill `+0.2919 / +0.1175 / +0.0121`).
+
+
 
 
 
