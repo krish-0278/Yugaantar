@@ -667,11 +667,101 @@ input[type="range"] {
   border: 1px solid var(--rule);
 }
 
+.speed-select {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper);
+  padding: 2px 4px;
+  font-size: 12px;
+}
+
+.cell-readout {
+  padding: 3px 8px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  min-height: 22px;
+}
+
 .map-frame canvas {
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
   display: block;
+  transition: opacity 150ms linear;
+}
+
+.map-frame canvas.crossfade {
+  opacity: 0.72;
+}
+
+.maps-row.is-loading .map-stage::after {
+  content: "Running rollout…";
+  position: absolute;
+  inset: 0;
+  background: var(--paper);
+  opacity: 0.85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.inline-seg {
+  margin-bottom: 0;
+}
+
+.inline-seg .seg-btn {
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+.chart-hover-readout {
+  margin-bottom: 2px;
+  min-height: 16px;
+}
+
+.proxy-pill {
+  font-size: 11px;
+  padding: 1px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper);
+  color: var(--muted);
+}
+
+.impact-row-hint {
+  border-bottom: 1px dotted var(--muted);
+  cursor: help;
+}
+
+.loading-status {
+  position: fixed;
+  bottom: 14px;
+  left: 14px;
+  z-index: 45;
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.error-toast {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  z-index: 50;
+  max-width: 380px;
+  background: var(--shock-tint);
+  border: 1px solid var(--shock);
+  border-radius: 2px;
+  padding: 7px 11px;
+  font-size: 12px;
+  color: var(--shock);
 }
 
 .map-overlay {
@@ -834,7 +924,7 @@ input[type="range"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .progress-bar, .progress-bar.active {
+  .progress-bar, .progress-bar.active, .map-frame canvas {
     animation: none;
     transition: none;
   }

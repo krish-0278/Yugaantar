@@ -255,15 +255,24 @@
           </div>
 
           <div class="day-controls">
-            <button id="playBtn" type="button" class="btn btn-secondary">Play</button>
-            <button id="prevDayBtn" type="button" class="btn-mini mono" title="Previous day" aria-label="Previous day">&lt;</button>
-            <input id="daySlider" type="range" min="0" max="9" step="1" value="0" aria-label="Rollout day">
-            <button id="nextDayBtn" type="button" class="btn-mini mono" title="Next day" aria-label="Next day">&gt;</button>
+            <button id="playBtn" type="button" class="btn btn-secondary" aria-label="Play or pause rollout">Play</button>
+            <select id="playSpeedSelect" class="speed-select mono" aria-label="Playback speed" title="Playback speed">
+              <option value="700">0.5x</option>
+              <option value="350" selected>1x</option>
+              <option value="175">2x</option>
+              <option value="90">4x</option>
+            </select>
+            <button id="prevDayBtn" type="button" class="btn-mini mono" title="Previous day (Left arrow)" aria-label="Previous day">&lt;</button>
+            <input id="daySlider" type="range" min="0" max="9" step="1" value="0" list="dayTicks" aria-label="Rollout day">
+            <datalist id="dayTicks"></datalist>
+            <button id="nextDayBtn" type="button" class="btn-mini mono" title="Next day (Right arrow)" aria-label="Next day">&gt;</button>
             <span id="dayReadout" class="mono day-readout">Day 1 / 10 (DOY 167)</span>
           </div>
         </div>
 
-        <section class="maps-row">
+        <div id="cellReadout" class="cell-readout mono small-note muted-text">Hover any map cell to inspect Prime, Multiverse, and Δ across all three panels.</div>
+
+        <section class="maps-row" id="mapsRow">
           <article class="map-card">
             <div class="map-head">
               <h3 class="panel-title">Prime (Control)</h3>
@@ -330,8 +339,13 @@
           <article class="panel-box chart-box">
             <div class="panel-head-inline">
               <h3 class="panel-title" id="chartTitle">Domain Mean Trajectory</h3>
-              <span class="small-note muted-text">solid: all cells · dashed: land only · vertical bar: selected day</span>
+              <div class="seg-group compact inline-seg" role="group" aria-label="Chart cell scope">
+                <button type="button" class="seg-btn active" data-chart-scope="both">Both</button>
+                <button type="button" class="seg-btn" data-chart-scope="all">All cells</button>
+                <button type="button" class="seg-btn" data-chart-scope="land">Land only</button>
+              </div>
             </div>
+            <div id="chartHoverReadout" class="mono small-note muted-text chart-hover-readout">Hover chart to inspect day values · click a day to jump</div>
             <div class="chart-wrap">
               <svg id="tsChart" viewBox="0 0 540 165" preserveAspectRatio="none"></svg>
             </div>
@@ -340,6 +354,7 @@
           <article class="panel-box impact-box">
             <div class="panel-head-inline">
               <h3 class="panel-title" id="impactTitle">Physical Proxy Impacts (over 10 days)</h3>
+              <span class="proxy-pill mono">proxy, not a forecast</span>
             </div>
             <table class="impact-table">
               <thead>
@@ -364,6 +379,10 @@
     </main>
   </div>
 
+  <div id="loadingOverlay" class="loading-status hidden" role="status" aria-live="polite">
+    <span class="mono" id="loadingLabel">Running rollout…</span>
+  </div>
+  <div id="errorToast" class="error-toast hidden" role="alert"></div>
   <div id="mapTooltip" class="map-tooltip mono hidden"></div>
   <script src="/app.js"></script>
 </body>

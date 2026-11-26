@@ -31,7 +31,12 @@
     chIdx: 0,
     dayIdx: 0,
     playing: false,
+    playSpeedMs: 350,
     playTimer: null,
+    chartScope: "both",
+    chartHoverIdx: null,
+    crosshair: null,
+    toastTimer: null,
     runData: null,
     running: false,
     abortCtrl: null
@@ -89,10 +94,17 @@
     },
     pertSummary: document.getElementById("pertSummary"),
     errorBanner: document.getElementById("errorBanner"),
+    loadingOverlay: document.getElementById("loadingOverlay"),
+    loadingLabel: document.getElementById("loadingLabel"),
+    errorToast: document.getElementById("errorToast"),
+    mapsRow: document.getElementById("mapsRow"),
+    cellReadout: document.getElementById("cellReadout"),
     playBtn: document.getElementById("playBtn"),
+    playSpeedSelect: document.getElementById("playSpeedSelect"),
     prevDayBtn: document.getElementById("prevDayBtn"),
     nextDayBtn: document.getElementById("nextDayBtn"),
     daySlider: document.getElementById("daySlider"),
+    dayTicks: document.getElementById("dayTicks"),
     dayReadout: document.getElementById("dayReadout"),
     primeCorner: document.getElementById("primeCorner"),
     multiCorner: document.getElementById("multiCorner"),
@@ -112,6 +124,7 @@
     cbDiffMax: document.getElementById("cbDiffMax"),
     nullCaption: document.getElementById("nullCaption"),
     chartTitle: document.getElementById("chartTitle"),
+    chartHoverReadout: document.getElementById("chartHoverReadout"),
     tsChart: document.getElementById("tsChart"),
     impactTitle: document.getElementById("impactTitle"),
     impactTbody: document.getElementById("impactTbody"),
@@ -119,12 +132,24 @@
   };
 
   function showError(msg) {
+    if (state.toastTimer) {
+      clearTimeout(state.toastTimer);
+      state.toastTimer = null;
+    }
     if (!msg) {
       el.errorBanner.textContent = "";
       el.errorBanner.classList.add("hidden");
+      if (el.errorToast) el.errorToast.classList.add("hidden");
     } else {
       el.errorBanner.textContent = msg;
       el.errorBanner.classList.remove("hidden");
+      if (el.errorToast) {
+        el.errorToast.textContent = msg;
+        el.errorToast.classList.remove("hidden");
+        state.toastTimer = setTimeout(() => {
+          el.errorToast.classList.add("hidden");
+        }, 5000);
+      }
     }
   }
 
@@ -332,11 +357,22 @@
       }
     }
 
+    let crosshairSvg = "";
+    if (state.crosshair) {
+      const { i, j } = state.crosshair;
+      const yCell = 31 - i;
+      crosshairSvg =
+        `<rect x="${j}" y="${yCell}" width="1" height="1" fill="none" stroke="${INK}" stroke-width="0.24"/>` +
+        `<line x1="${j + 0.5}" y1="0" x2="${j + 0.5}" y2="32" stroke="${INK}" stroke-width="0.12" stroke-opacity="0.45"/>` +
+        `<line x1="0" y1="${yCell + 0.5}" x2="36" y2="${yCell + 0.5}" stroke="${INK}" stroke-width="0.12" stroke-opacity="0.45"/>`;
+    }
+
     const svgInner =
       `<path d="${cachedCoastPath}" fill="none" stroke="${INK}" stroke-width="0.16" stroke-opacity="0.85"/>` +
       shockPath +
       customMarker +
-      ghostMarker;
+      ghostMarker +
+      crosshairSvg;
 
     el.overlayPrime.innerHTML = svgInner;
     el.overlayMulti.innerHTML = svgInner;
@@ -575,11 +611,28 @@
     const curDoy = rolloutDoy(state.runData.doy, k);
     el.daySlider.max = String(state.runData.steps - 1);
     el.daySlider.value = String(k);
+    if (el.dayTicks && el.dayTicks.childElementCount !== state.runData.steps) {
+      let opts = "";
+      for (let s = 0; s < state.runData.steps; s++) {
+        opts += `<option value="${s}"></option>`;
+      }
+      el.dayTicks.innerHTML = opts;
+    }
     el.dayReadout.textContent = `Day ${k + 1} / ${state.runData.steps} (DOY ${curDoy})`;
     el.primeCorner.textContent = `day ${k + 1} (doy ${curDoy})`;
     el.multiCorner.textContent = `day ${k + 1} (doy ${curDoy})`;
 
     renderMapOverlays();
+  }
+
+  function triggerCrossfade() {
+    const canvases = [el.canvasPrime, el.canvasMulti, el.canvasDiff];
+    canvases.forEach((c) => c && c.classList.add("crossfade"));
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        canvases.forEach((c) => c && c.classList.remove("crossfade"));
+      });
+    });
   }
 
   function renderTimeseries() {
@@ -598,7 +651,11 @@
 
     el.chartTitle.textContent = `Domain Mean: ${ch.short} (${ch.unit})`;
 
-    const vals = allP.concat(allM, landP, landM);
+    const showAll = state.chartScope === "both" || state.chartScope === "all";
+    const showLand = state.chartScope === "both" || state.chartScope === "land";
+    let vals = [];
+    if (showAll) vals = vals.concat(allP, allM);
+    if (showLand) vals = vals.concat(landP, landM);
     let yMin = Math.min(...vals);
     let yMax = Math.max(...vals);
     const pad = Math.max((yMax - yMin) * 0.12, 1e-4);
@@ -637,17 +694,29 @@
     });
 
     const curX = xOf(state.dayIdx);
-    out += `<line x1="${curX.toFixed(1)}" y1="${mT}" x2="${curX.toFixed(1)}" y2="${H - mB}" stroke="${ACCENT}" stroke-width="1.2"/>`;
+    out += `<line x1="${curX.toFixed(1)}" y1="${mT}" x2="${curX.toFixed(1)}" y2="${H - mB}" stroke="${ACCENT}" stroke-width="1.4"/>`;
 
-    out += `<path d="${toPath(landP)}" fill="none" stroke="${INK}" stroke-width="1.4" stroke-dasharray="3.5 2.5" stroke-opacity="0.7"/>`;
-    out += `<path d="${toPath(landM)}" fill="none" stroke="${SHOCK}" stroke-width="1.4" stroke-dasharray="3.5 2.5" stroke-opacity="0.85"/>`;
-    out += `<path d="${toPath(allP)}" fill="none" stroke="${INK}" stroke-width="2.0"/>`;
-    out += `<path d="${toPath(allM)}" fill="none" stroke="${SHOCK}" stroke-width="1.6"/>`;
+    if (state.chartHoverIdx !== null && state.chartHoverIdx >= 0 && state.chartHoverIdx < steps) {
+      const hx = xOf(state.chartHoverIdx);
+      out += `<line x1="${hx.toFixed(1)}" y1="${mT}" x2="${hx.toFixed(1)}" y2="${H - mB}" stroke="${MUTED}" stroke-width="1.0" stroke-dasharray="2 2"/>`;
+    }
 
+    if (showLand) {
+      const dash = state.chartScope === "land" ? "" : ` stroke-dasharray="3.5 2.5" stroke-opacity="0.75"`;
+      out += `<path d="${toPath(landP)}" fill="none" stroke="${INK}" stroke-width="1.5"${dash}/>`;
+      out += `<path d="${toPath(landM)}" fill="none" stroke="${SHOCK}" stroke-width="1.5"${dash}/>`;
+    }
+    if (showAll) {
+      out += `<path d="${toPath(allP)}" fill="none" stroke="${INK}" stroke-width="2.0"/>`;
+      out += `<path d="${toPath(allM)}" fill="none" stroke="${SHOCK}" stroke-width="1.6"/>`;
+    }
+
+    const primaryP = showAll ? allP : landP;
+    const primaryM = showAll ? allM : landM;
     const lastIdx = steps - 1;
     const endX = xOf(lastIdx) + 5;
-    let yEndP = yOf(allP[lastIdx]);
-    let yEndM = yOf(allM[lastIdx]);
+    let yEndP = yOf(primaryP[lastIdx]);
+    let yEndM = yOf(primaryM[lastIdx]);
     if (Math.abs(yEndP - yEndM) < 12) {
       if (yEndM >= yEndP) {
         yEndM = yEndP + 12;
@@ -666,8 +735,8 @@
     out += `<text x="${endX.toFixed(1)}" y="${(yEndP + 3).toFixed(1)}" fill="${INK}" font-size="10">Prime</text>`;
     out += `<text x="${endX.toFixed(1)}" y="${(yEndM + 3).toFixed(1)}" fill="${SHOCK}" font-size="10">Multiverse</text>`;
 
-    out += `<circle cx="${curX.toFixed(1)}" cy="${yOf(allP[state.dayIdx]).toFixed(1)}" r="2.8" fill="${INK}"/>`;
-    out += `<circle cx="${curX.toFixed(1)}" cy="${yOf(allM[state.dayIdx]).toFixed(1)}" r="2.5" fill="${SHOCK}"/>`;
+    out += `<circle cx="${curX.toFixed(1)}" cy="${yOf(primaryP[state.dayIdx]).toFixed(1)}" r="2.8" fill="${INK}"/>`;
+    out += `<circle cx="${curX.toFixed(1)}" cy="${yOf(primaryM[state.dayIdx]).toFixed(1)}" r="2.5" fill="${SHOCK}"/>`;
 
     svg.innerHTML = out;
   }
@@ -683,6 +752,7 @@
     const rows = [
       {
         label: "Heatwave (≥ +3 K, ≥2 d)",
+        hint: "Land cell-days with t2m - clim_t2m >= 3.0 K for >= 2 consecutive days.",
         pv: formatNum(p.heatwave_cell_days, 1),
         mv: formatNum(m.heatwave_cell_days, 1),
         dv: d.heatwave_cell_days.abs,
@@ -690,6 +760,7 @@
       },
       {
         label: "Heavy rain ≥ 64.5 mm/d",
+        hint: "Share of land cell-days with tp >= 64.5 mm/day.",
         pv: `${(p.heavy_rain_64_share * 100).toFixed(2)}%`,
         mv: `${(m.heavy_rain_64_share * 100).toFixed(2)}%`,
         dv: d.heavy_rain_64_share.abs * 100,
@@ -697,6 +768,7 @@
       },
       {
         label: "Very heavy ≥ 115.6 mm/d",
+        hint: "Share of land cell-days with tp >= 115.6 mm/day.",
         pv: `${(p.heavy_rain_115_share * 100).toFixed(2)}%`,
         mv: `${(m.heavy_rain_115_share * 100).toFixed(2)}%`,
         dv: d.heavy_rain_115_share.abs * 100,
@@ -704,6 +776,7 @@
       },
       {
         label: "Rain deficit (> 20% below clim)",
+        hint: "Share of land cells with cumulative rollout tp > 20% below cumulative climatology.",
         pv: `${(p.rain_deficit_share * 100).toFixed(1)}%`,
         mv: `${(m.rain_deficit_share * 100).toFixed(1)}%`,
         dv: d.rain_deficit_share.abs * 100,
@@ -711,6 +784,7 @@
       },
       {
         label: "Crop stress CSI (weighted)",
+        hint: "Land area-weighted mean of clip(0.6*waterDeficit + 0.4*heatStress, 0, 1).",
         pv: p.crop_stress_csi.toFixed(3),
         mv: m.crop_stress_csi.toFixed(3),
         dv: d.crop_stress_csi.abs,
@@ -721,20 +795,20 @@
     el.impactTbody.innerHTML = rows
       .map((r) => {
         const eps = 1e-9;
-        let arrow = "·";
+        let marker = "[=]";
         let cls = "muted-text";
         if (r.dv > eps) {
-          arrow = "▲";
+          marker = "[+]";
           cls = "delta-up";
         } else if (r.dv < -eps) {
-          arrow = "▼";
+          marker = "[-]";
           cls = "delta-down";
         }
         return `<tr>
-          <td>${r.label}</td>
+          <td><span class="impact-row-hint" title="${r.hint}">${r.label}</span></td>
           <td class="num">${r.pv}</td>
           <td class="num">${r.mv}</td>
-          <td class="num ${cls}">${arrow} ${r.fmtDelta(r.dv)}</td>
+          <td class="num ${cls}">${marker} ${r.fmtDelta(r.dv)}</td>
         </tr>`;
       })
       .join("");
@@ -837,6 +911,9 @@
 
     el.runBtn.disabled = true;
     el.progressBar.classList.add("active");
+    if (el.mapsRow) el.mapsRow.classList.add("is-loading");
+    if (el.loadingOverlay) el.loadingOverlay.classList.remove("hidden");
+    if (el.loadingLabel) el.loadingLabel.textContent = `Running ${state.steps}-day rollout…`;
 
     try {
       await ensureInitStates();
@@ -882,6 +959,8 @@
       state.running = false;
       el.runBtn.disabled = false;
       el.progressBar.classList.remove("active");
+      if (el.mapsRow) el.mapsRow.classList.remove("is-loading");
+      if (el.loadingOverlay) el.loadingOverlay.classList.add("hidden");
     }
   }
 
@@ -894,6 +973,17 @@
     }
   }
 
+  function startPlayTimer() {
+    if (state.playTimer) clearInterval(state.playTimer);
+    state.playTimer = setInterval(() => {
+      if (!state.runData) return stopPlayback();
+      state.dayIdx = (state.dayIdx + 1) % state.runData.steps;
+      triggerCrossfade();
+      renderMapsAndColorbars();
+      renderTimeseries();
+    }, state.playSpeedMs);
+  }
+
   function togglePlayback() {
     if (!state.runData) return;
     if (state.playing) {
@@ -902,18 +992,14 @@
     }
     state.playing = true;
     el.playBtn.textContent = "Pause";
-    state.playTimer = setInterval(() => {
-      if (!state.runData) return stopPlayback();
-      state.dayIdx = (state.dayIdx + 1) % state.runData.steps;
-      renderMapsAndColorbars();
-      renderTimeseries();
-    }, 350);
+    startPlayTimer();
   }
 
   function stepDay(delta) {
     if (!state.runData) return;
     stopPlayback();
     state.dayIdx = clamp(state.dayIdx + delta, 0, state.runData.steps - 1);
+    triggerCrossfade();
     renderMapsAndColorbars();
     renderTimeseries();
   }
@@ -1112,11 +1198,73 @@
     });
 
     el.playBtn.addEventListener("click", togglePlayback);
+    if (el.playSpeedSelect) {
+      el.playSpeedSelect.addEventListener("change", () => {
+        state.playSpeedMs = parseInt(el.playSpeedSelect.value, 10) || 350;
+        if (state.playing) startPlayTimer();
+      });
+    }
     el.prevDayBtn.addEventListener("click", () => stepDay(-1));
     el.nextDayBtn.addEventListener("click", () => stepDay(1));
     el.daySlider.addEventListener("input", () => {
       stopPlayback();
       state.dayIdx = parseInt(el.daySlider.value, 10);
+      triggerCrossfade();
+      renderMapsAndColorbars();
+      renderTimeseries();
+    });
+
+    document.querySelectorAll("[data-chart-scope]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.chartScope = btn.dataset.chartScope;
+        document.querySelectorAll("[data-chart-scope]").forEach((b) => b.classList.toggle("active", b === btn));
+        renderTimeseries();
+      });
+    });
+
+    const getChartDayIdx = (evt) => {
+      if (!state.runData) return null;
+      const rect = el.tsChart.getBoundingClientRect();
+      const svgX = ((evt.clientX - rect.left) / rect.width) * 540;
+      const mL = 48;
+      const mR = 68;
+      const plotW = 540 - mL - mR;
+      const frac = clamp((svgX - mL) / plotW, 0, 1);
+      const steps = state.runData.steps;
+      return steps <= 1 ? 0 : Math.round(frac * (steps - 1));
+    };
+
+    el.tsChart.addEventListener("mousemove", (evt) => {
+      const idx = getChartDayIdx(evt);
+      if (idx === null) return;
+      state.chartHoverIdx = idx;
+      const ch = state.channels[state.chIdx];
+      const ts = state.runData.timeseries;
+      const ap = ts.all[ch.key].prime[idx];
+      const am = ts.all[ch.key].multiverse[idx];
+      const lp = ts.land[ch.key].prime[idx];
+      const lm = ts.land[ch.key].multiverse[idx];
+      if (el.chartHoverReadout) {
+        el.chartHoverReadout.textContent =
+          `Day ${idx + 1}: All P=${formatNum(ap, 2)} M=${formatNum(am, 2)} · Land P=${formatNum(lp, 2)} M=${formatNum(lm, 2)} ${ch.unit}`;
+      }
+      renderTimeseries();
+    });
+
+    el.tsChart.addEventListener("mouseleave", () => {
+      state.chartHoverIdx = null;
+      if (el.chartHoverReadout) {
+        el.chartHoverReadout.textContent = "Hover chart to inspect day values · click a day to jump";
+      }
+      renderTimeseries();
+    });
+
+    el.tsChart.addEventListener("click", (evt) => {
+      const idx = getChartDayIdx(evt);
+      if (idx === null) return;
+      stopPlayback();
+      state.dayIdx = idx;
+      triggerCrossfade();
       renderMapsAndColorbars();
       renderTimeseries();
     });
@@ -1166,12 +1314,16 @@
         }
         if (!state.runData) return;
         const { i, j, lat, lon } = pt;
+        state.crosshair = { i, j };
+        renderMapOverlays();
         const ch = state.channels[state.chIdx];
         const k = state.dayIdx;
         const pv = state.runData.control[k][state.chIdx][i][j];
         const mv = state.runData.shocked[k][state.chIdx][i][j];
         const dv = state.runData.diff[k][state.chIdx][i][j];
         const isLand = state.meta && state.meta.grid.land_sea_mask[i][j] >= 0.5;
+        const summary = `${lat.toFixed(1)}°N ${lon.toFixed(1)}°E (${isLand ? "land" : "sea"}) · Prime ${formatNum(pv, 2)} ${ch.unit} · Multiverse ${formatNum(mv, 2)} ${ch.unit} · Δ ${dv >= 0 ? "+" : ""}${formatNum(dv, 2)} ${ch.unit}`;
+        if (el.cellReadout) el.cellReadout.textContent = summary;
 
         el.mapTooltip.textContent =
           `${lat.toFixed(1)}°N ${lon.toFixed(1)}°E (${isLand ? "land" : "sea"}) | P:${formatNum(pv, 2)} M:${formatNum(mv, 2)} Δ:${dv >= 0 ? "+" : ""}${formatNum(dv, 2)} ${ch.unit}`;
@@ -1184,11 +1336,12 @@
 
       frame.addEventListener("mouseleave", () => {
         el.mapTooltip.classList.add("hidden");
+        state.crosshair = null;
         if (state.hoverGrid) {
           state.hoverGrid = null;
           if (!state.dragDraw) updateDrawReadout();
-          renderMapOverlays();
         }
+        renderMapOverlays();
       });
     });
 
@@ -1232,6 +1385,12 @@
       } else if (evt.key === " ") {
         evt.preventDefault();
         togglePlayback();
+      } else if (/^[1-6]$/.test(evt.key)) {
+        const idx = parseInt(evt.key, 10) - 1;
+        state.chIdx = idx;
+        document.querySelectorAll("[data-ch]").forEach((b) => b.classList.toggle("active", parseInt(b.dataset.ch, 10) === idx));
+        renderMapsAndColorbars();
+        renderTimeseries();
       }
     });
   }
