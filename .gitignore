@@ -9,3 +9,7 @@ __pycache__/
 .venv/
 docs/BUILD_GUIDE.md
 docs/R1_CONTRACT.md
+
+docs/CHECKPOINT.md
+docs/CHECKPOINT_2.md
+docs/summary.md
