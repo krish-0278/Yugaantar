@@ -74,7 +74,7 @@
     "beta_tail_tau": 10.0,
     "qm_lam_candidates": [0.0, 0.25, 0.5, 0.75, 1.0],
     "pattern_gain_grid": [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8],
-    "tp_var_ratio_target": 0.45,
+    "tp_var_ratio_target": 0.52,
     "non_rain_var_ratio_floor": 0.5,
     "var_restore_cap": 1.3,
     "event_fit_leads": [1, 4, 8],

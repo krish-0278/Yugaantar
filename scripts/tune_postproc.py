@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -64,6 +65,12 @@ def _apply_pattern_gain_batch(tp_batch: np.ndarray, g: float) -> np.ndarray:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Tune post-processing strictly on VAL.")
+    parser.add_argument("--target-vr", type=float, default=None, help="Override tp day-8 variance ratio target on val.")
+    parser.add_argument("--baseline-g8", type=float, default=1.2, help="Reference g_8 for Task 0 safety-margin acceptance check.")
+    parser.add_argument("--check-safety-margin", action="store_true", help="Accept new g_8 only if val lead-8 mean skill >= -0.005 and tp RMSE rise < 0.15 mm vs baseline-g8.")
+    args = parser.parse_args()
+
     with CONFIG_PATH.open("r", encoding="utf-8") as f:
         cfg = json.load(f)
 
@@ -106,7 +113,7 @@ def main() -> int:
     anom_clamp = float(cfg["stage_b"]["anom_clamp"])
     input_clip = float(cfg["norm"]["anomaly_clip"])
     rain_thresh = float(cfg["metrics"]["rain_threshold_mm"])
-    tp_vr_target = float(pp_cfg["tp_var_ratio_target"])  # 0.45
+    tp_vr_target = float(args.target_vr) if args.target_vr is not None else float(pp_cfg["tp_var_ratio_target"])
 
     val_starts = val_idx[2 : len(val_idx) - steps].astype(np.int64)
     print(f"Generating {steps}-step rollouts on {len(val_starts)} VAL start days (target tp var ratio >= {tp_vr_target:.2f})...", flush=True)
@@ -340,6 +347,54 @@ def main() -> int:
     improves_csi = (csi_with[4] >= csi_without[4]) and (csi_with[8] >= csi_without[8])
     use_event_coupling = bool(beats_emp_with and improves_csi)
     print(f"Event coupling decision: use_event_coupling={use_event_coupling}")
+
+    # Task 0 val-only safety-margin acceptance gate if requested
+    if args.check_safety_margin and chosen_method == "pattern_gain" and g8_chosen is not None:
+        ref_g8 = float(args.baseline_g8)
+        ref_sched = np.array([1.0 + (ref_g8 - 1.0) * np.clip(((k + 1) - 4.0) / 4.0, 0.0, 1.0) for k in range(steps)], dtype=np.float64)
+        tp_ref_all8 = _apply_pattern_gain_batch(phys_kappa[:, 7, CH_TP], float(ref_sched[7]))
+        ref_pk8 = float(np.sum(true_phys[:, 7, CH_TP])) / max(float(np.sum(tp_ref_all8)), 1e-12)
+        tp_ref_win8 = np.maximum(tp_ref_all8[win_pos] * ref_pk8, 0.0)
+        if use_event_coupling:
+            tp_ref_win8 = np.where(probs_all[win_pos, 7] > interp_thrs[7], np.maximum(tp_ref_win8, hi_mm), np.minimum(tp_ref_win8, lo_mm))
+        ref_tp_rmse8 = float(lat_weighted_rmse(tp_ref_win8[:, None], true_phys[win_pos, 7, CH_TP][:, None], lat_w)[0])
+
+        tp_new_win8 = chosen_phys[win_pos, 7, CH_TP]
+        if use_event_coupling:
+            tp_new_win8 = np.where(probs_all[win_pos, 7] > interp_thrs[7], np.maximum(tp_new_win8, hi_mm), np.minimum(tp_new_win8, lo_mm))
+        new_tp_rmse8 = float(lat_weighted_rmse(tp_new_win8[:, None], true_phys[win_pos, 7, CH_TP][:, None], lat_w)[0])
+
+        # Compute full 6-channel val lead-8 mean skill with new g_8
+        pred_all_8 = chosen_phys[win_pos, 7].copy()
+        pred_all_8[:, CH_TP] = tp_new_win8
+        true_all_8 = true_phys[win_pos, 7]
+        r_mod8 = lat_weighted_rmse(pred_all_8, true_all_8, lat_w)
+        pers_8 = np.array([data_phys[t] for t in val_win_t], dtype=np.float32)
+        harm_8 = np.array([clim_all[t + 8] for t in val_win_t], dtype=np.float32)
+        emp_8 = np.array([evaluate_empirical(emp_table, np.array([doy[t] + 8]), period=period)[0] for t in val_win_t], dtype=np.float32)
+        r_best8 = np.minimum(
+            lat_weighted_rmse(pers_8, true_all_8, lat_w),
+            np.minimum(lat_weighted_rmse(harm_8, true_all_8, lat_w), lat_weighted_rmse(emp_8, true_all_8, lat_w)),
+        )
+        new_mean_skill8 = float(np.mean(1.0 - r_mod8 / r_best8))
+        rmse_rise = new_tp_rmse8 - ref_tp_rmse8
+
+        print(
+            f"\n=== Task 0 Val-Only Safety Margin Check (target_vr={tp_vr_target:.2f} -> g8={g8_chosen:.1f} vs g8={ref_g8:.1f}) ==="
+        )
+        print(f"  VAL lead-8 mean skill = {new_mean_skill8:+.4f} (require >= -0.0050)")
+        print(f"  VAL lead-8 tp RMSE    = {new_tp_rmse8:.4f} vs {ref_tp_rmse8:.4f} (rise={rmse_rise:+.4f}, require < +0.1500)")
+
+        if new_mean_skill8 >= -0.005 and rmse_rise < 0.15:
+            print(f"  DECISION: ACCEPT g_8 = {g8_chosen:.1f} (passes both val criteria).")
+        else:
+            print(f"  DECISION: REJECT g_8 = {g8_chosen:.1f}; REVERTING to g_8 = {ref_g8:.1f}.")
+            g8_chosen = ref_g8
+            g_sched = ref_sched
+            g_post_kappa = np.ones(steps, dtype=np.float64)
+            for k in range(steps):
+                tp_g_all = _apply_pattern_gain_batch(phys_kappa[:, k, CH_TP], float(g_sched[k]))
+                g_post_kappa[k] = float(np.sum(true_phys[:, k, CH_TP])) / max(float(np.sum(tp_g_all)), 1e-12)
 
     # Physical clamps
     phys_min = norm["phys_min"].astype(np.float64)

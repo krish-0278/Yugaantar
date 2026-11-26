@@ -16,6 +16,8 @@ NC_PATH = DATA_DIR / "india_climate_train.nc"
 STATS_PATH = DATA_DIR / "stats.json"
 GRID_JSON_PATH = ROOT / "dashboard" / "static" / "assets" / "grid.json"
 STATIC_NPZ_PATH = ROOT / "weights" / "static.npz"
+CHANNEL_STD_JSON_PATH = ROOT / "weights" / "channel_std_phys.json"
+CONFIG_PATH = ROOT / "config" / "default.json"
 
 
 def main() -> None:
@@ -157,6 +159,19 @@ def main() -> None:
         lon=lon.astype(np.float32),
     )
     print(f"Exported {STATIC_NPZ_PATH} ({STATIC_NPZ_PATH.stat().st_size} bytes)")
+
+    with CONFIG_PATH.open("r", encoding="utf-8") as f:
+        cfg = json.load(f)
+    n_train = int(data_arr.shape[0] * float(cfg["split"]["train"]))
+    train_std = data_arr[:n_train].std(axis=(0, 2, 3)).astype(np.float64)
+    std_payload = {
+        "channels": channels,
+        "std": [round(float(v), 6) for v in train_std],
+        "n_train": n_train,
+    }
+    with CHANNEL_STD_JSON_PATH.open("w", encoding="utf-8") as f:
+        json.dump(std_payload, f, indent=2)
+    print(f"Exported TRAIN physical channel stds -> {CHANNEL_STD_JSON_PATH}: {std_payload['std']}")
     ds.close()
 
 
