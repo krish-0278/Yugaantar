@@ -84,6 +84,20 @@
 
 - **Known limitation:** `monsoon_stall` `propagates` remains at **`40.6%`** (`39/96`; `8/53` for box `mean|u10| < 3 m/s`, `13/21` for `3..5 m/s`, `18/22` for `>= 5 m/s`) because the frozen model's learned persistence factor `sigmoid(rho_logit)` is `~0.83–0.85/day` (`[0.8387, 0.8465, 0.8316, 0.8292, 0.8505, 0.8448]`), attenuating localized wind perturbations before outside energy exceeds `2%` of day-1 peak total energy in weak-wind windows.
 
+## Phase 4 — Serving Endpoint, Safety Margin (`g_8 = 1.4`), and Clean-Copy Live Checks
+
+- **What:**
+  - Task 0 (`val`-only safety margin): exported train-split `weights/channel_std_phys.json` (`[13.4274, 7.5107, 2.8990, 2.4328, 617.1746, 20.4125]`) and re-ran `scripts/tune_postproc.py` at target day-8 `tp` variance ratio `>= 0.52`, accepting `g_8 = 1.4`.
+  - Refactored data transforms into `monsoon/transforms.py` (removing `xarray` / `data/` from the serving chain) and implemented `monsoon/shock.py`, `monsoon/infer.py` (`Simulator`), and `serve.py` (`GET/POST /health`, `POST /simulate`, lock, strict `400` validation, startup warmup, `0.0.0.0`).
+  - Added `tests/test_serve.py` and `tests/test_shocks_serving.py` across `96` de-duplicated held-out windows (`48 val + 48 test`, removing 4 duplicate `t_last` entries).
+- **Why:** Raising `tp` variance margin on `val` keeps `test` day-8 `tp` variance ratio safely above the `0.40` floor without tuning on `test`; extracting `monsoon/transforms.py` keeps the serving import chain strictly on whitelisted libraries and independent of `data/`.
+- **Measured effect:**
+  - **Task 0 (`g_8 = 1.4`):** On `val`, lead-8 mean skill stayed `+0.0122 >= -0.005` (`tp` RMSE `9.1110` vs `9.0448`, rise `+0.0662 mm < 0.15 mm`). On `test` (reported once), day-8 `tp` variance ratio = **`0.5095`** (`t2m=1.0495, u10=0.6380, v10=0.6647, msl=0.8671, tcwv=0.8436`), lead-1/4/8 mean skill = `+0.2919 / +0.1175 / +0.0121`, CSI lead 4 = `0.3877` (emp `0.2848`), lead 8 = `0.3431` (emp `0.2995`).
+  - **Clean-copy live server (`67` tracked files, no `data/`):** Ready in `2.80 s` (`RSS = 265.7 MB`, `PeakRSS = 303.5 MB` through 60-step call); `monsoon_r1.schema_validator` passed **6/6**; zero writes outside temp dir; `repo_scan` on clean copy scored **`15.0 / 15.0`** (`flags = []`).
+  - **HTTP judge rehearsal (`127.0.0.1:8000`):** All 8 calls valid (`0` NaN/Inf, `min_tp = 0.0`, `t2m in [-25.28, +37.08] C`); control max wall `0.131 s`; shocked wall `0.147 s` (`warm_ocean`) and `0.162 s` (`monsoon_stall`); null call bitwise equal (`max|diff|/std = 0.0`). On Windows `localhost` DNS hits IPv6 `::1` (`~2.00 s` fallback to IPv4 `0.0.0.0:8000`) before IPv4 round-trip (`~0.11–0.16 s`).
+  - **Benchmarks (`20 x 10-step`):** `threads=4` control `p50=0.118 s / max=0.164 s`, shocked `p50=0.159 s / max=0.173 s`; `threads=1` control `p50=0.138 s / max=0.157 s`, shocked `p50=0.216 s / max=0.219 s`.
+
+
 
 
 
