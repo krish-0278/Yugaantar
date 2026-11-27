@@ -23,7 +23,7 @@
   "model": {
     "cin": 34,
     "cout": 6,
-    "channels": 96,
+    "channels": 128,
     "n_blocks": 2,
     "expansion": 2,
     "max_step_radius": 3

@@ -1,12 +1,12 @@
 (() => {
   "use strict";
 
-  const PAPER = "#f4f1ea";
-  const INK = "#1d1d1b";
-  const MUTED = "#6b675d";
-  const RULE = "#cfc9bb";
-  const ACCENT = "#0f5c5c";
-  const SHOCK = "#c8402a";
+  const PAPER = "#eef1f4";
+  const INK = "#111827";
+  const MUTED = "#4b5563";
+  const RULE = "#cfd6df";
+  const ACCENT = "#1e3a5f";
+  const SHOCK = "#b91c1c";
 
   const state = {
     meta: null,
@@ -37,6 +37,7 @@
     chartHoverIdx: null,
     crosshair: null,
     toastTimer: null,
+    relief3d: true,
     runHistory: [],
     activeRunId: null,
     runData: null,
@@ -135,7 +136,9 @@
     chartHoverReadout: document.getElementById("chartHoverReadout"),
     tsChart: document.getElementById("tsChart"),
     impactTitle: document.getElementById("impactTitle"),
+    impactSummaryBanner: document.getElementById("impactSummaryBanner"),
     impactTbody: document.getElementById("impactTbody"),
+    reliefToggleBtn: document.getElementById("reliefToggleBtn"),
     mapTooltip: document.getElementById("mapTooltip")
   };
 
@@ -184,29 +187,29 @@
 
   const LUTS = {
     warm: [
-      [246, 241, 229],
-      [234, 198, 130],
-      [210, 118, 56],
-      [135, 36, 22]
+      [255, 251, 235],
+      [253, 212, 132],
+      [217, 119, 44],
+      [127, 29, 29]
     ],
     rain: [
-      [246, 243, 236],
-      [164, 212, 206],
-      [42, 136, 138],
-      [10, 62, 68]
+      [244, 248, 251],
+      [158, 202, 225],
+      [49, 130, 189],
+      [8, 48, 107]
     ],
     pressure: [
-      [236, 239, 238],
-      [165, 184, 184],
-      [78, 108, 114],
-      [26, 44, 52]
+      [248, 250, 252],
+      [186, 196, 208],
+      [100, 116, 139],
+      [30, 41, 59]
     ],
     diverging: [
-      [33, 94, 138],
-      [148, 188, 210],
-      [244, 241, 234],
-      [226, 146, 112],
-      [190, 48, 28]
+      [33, 102, 172],
+      [146, 197, 222],
+      [247, 247, 247],
+      [244, 165, 130],
+      [178, 24, 43]
     ]
   };
 
@@ -246,33 +249,196 @@
     ctx.putImageData(img, 0, 0);
   }
 
+  let cachedLandRelief = null;
+
+  function getLandReliefField() {
+    if (cachedLandRelief) return cachedLandRelief;
+    if (!state.meta || !state.meta.grid || !state.meta.grid.land_sea_mask) return null;
+    const raw = state.meta.grid.land_sea_mask;
+    const H = 32;
+    const W = 36;
+    // Light 3x3 smoothing of land mask so continental shelf has a clean beveled 3D edge
+    const out = Array.from({ length: H }, () => new Float32Array(W));
+    for (let i = 0; i < H; i++) {
+      for (let j = 0; j < W; j++) {
+        let s = 0;
+        let cnt = 0;
+        for (let di = -1; di <= 1; di++) {
+          for (let dj = -1; dj <= 1; dj++) {
+            const ni = i + di;
+            const nj = j + dj;
+            if (ni >= 0 && ni < H && nj >= 0 && nj < W) {
+              const w = di === 0 && dj === 0 ? 4 : 1;
+              s += (raw[ni][nj] >= 0.5 ? 1 : 0) * w;
+              cnt += w;
+            }
+          }
+        }
+        out[i][j] = s / cnt;
+      }
+    }
+    cachedLandRelief = out;
+    return cachedLandRelief;
+  }
+
+  function bilerpField(field, fi, fj, H, W) {
+    const ci = clamp(fi, 0, H - 1);
+    const cj = clamp(fj, 0, W - 1);
+    const i0 = Math.floor(ci);
+    const j0 = Math.floor(cj);
+    const i1 = Math.min(i0 + 1, H - 1);
+    const j1 = Math.min(j0 + 1, W - 1);
+    const ti = ci - i0;
+    const tj = cj - j0;
+    const v00 = field[i0][j0];
+    const v01 = field[i0][j1];
+    const v10 = field[i1][j0];
+    const v11 = field[i1][j1];
+    return (v00 * (1 - tj) + v01 * tj) * (1 - ti) + (v10 * (1 - tj) + v11 * tj) * ti;
+  }
+
   function drawGridCanvas(canvas, field, vmin, vmax, stops) {
     const H = 32;
     const W = 36;
-    if (canvas.width !== W || canvas.height !== H) {
-      canvas.width = W;
-      canvas.height = H;
-    }
-    const ctx = canvas.getContext("2d");
-    const img = ctx.createImageData(W, H);
     const span = vmax - vmin;
 
-    for (let i = 0; i < H; i++) {
-      // North at top: row i=31 maps to y=0, row i=0 maps to y=31
-      const canvasY = H - 1 - i;
-      const row = field[i];
-      for (let j = 0; j < W; j++) {
-        const val = row[j];
+    if (!state.relief3d) {
+      canvas.classList.add("flat-grid");
+      if (canvas.width !== W || canvas.height !== H) {
+        canvas.width = W;
+        canvas.height = H;
+      }
+      const ctx = canvas.getContext("2d");
+      const img = ctx.createImageData(W, H);
+      for (let i = 0; i < H; i++) {
+        const canvasY = H - 1 - i;
+        const row = field[i];
+        for (let j = 0; j < W; j++) {
+          const t = span > 1e-12 ? (row[j] - vmin) / span : 0.5;
+          const rgb = sampleStops(stops, t);
+          const p = (canvasY * W + j) * 4;
+          img.data[p] = rgb[0];
+          img.data[p + 1] = rgb[1];
+          img.data[p + 2] = rgb[2];
+          img.data[p + 3] = 255;
+        }
+      }
+      ctx.putImageData(img, 0, 0);
+      return;
+    }
+
+    canvas.classList.remove("flat-grid");
+    const SCALE = 10;
+    const CW = W * SCALE;
+    const CH = H * SCALE;
+    if (canvas.width !== CW || canvas.height !== CH) {
+      canvas.width = CW;
+      canvas.height = CH;
+    }
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(CW, CH);
+    const landRel = getLandReliefField();
+
+    // Normalized height buffer for 3D relief shading (field topography + raised land shelf)
+    const elev = new Float32Array(CW * CH);
+    for (let py = 0; py < CH; py++) {
+      const fi = H - 1 - ((py + 0.5) / SCALE - 0.5);
+      for (let px = 0; px < CW; px++) {
+        const fj = (px + 0.5) / SCALE - 0.5;
+        const val = bilerpField(field, fi, fj, H, W);
+        const t = span > 1e-12 ? clamp((val - vmin) / span, 0, 1) : 0.5;
+        const lElev = landRel ? bilerpField(landRel, fi, fj, H, W) : 0;
+        elev[py * CW + px] = t * 1.9 + lElev * 0.65;
+      }
+    }
+
+    // NW directional key light + subtle half-vector specular
+    const lx = -0.58;
+    const ly = -0.58;
+    const lz = 0.57;
+    const hx = -0.32;
+    const hy = -0.32;
+    const hz = 0.89;
+
+    for (let py = 0; py < CH; py++) {
+      const fi = H - 1 - ((py + 0.5) / SCALE - 0.5);
+      const pym = Math.max(0, py - 1);
+      const pyp = Math.min(CH - 1, py + 1);
+      for (let px = 0; px < CW; px++) {
+        const fj = (px + 0.5) / SCALE - 0.5;
+        const val = bilerpField(field, fi, fj, H, W);
         const t = span > 1e-12 ? (val - vmin) / span : 0.5;
         const rgb = sampleStops(stops, t);
-        const p = (canvasY * W + j) * 4;
-        img.data[p] = rgb[0];
-        img.data[p + 1] = rgb[1];
-        img.data[p + 2] = rgb[2];
+
+        const pxm = Math.max(0, px - 1);
+        const pxp = Math.min(CW - 1, px + 1);
+        const dzdx = (elev[py * CW + pxp] - elev[py * CW + pxm]) * 1.45;
+        const dzdy = (elev[pyp * CW + px] - elev[pym * CW + px]) * 1.45;
+
+        const nx = -dzdx;
+        const ny = -dzdy;
+        const nz = 1.0;
+        const invLen = 1.0 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+        const unx = nx * invLen;
+        const uny = ny * invLen;
+        const unz = nz * invLen;
+
+        const diff = Math.max(0.0, unx * lx + uny * ly + unz * lz);
+        const specDot = Math.max(0.0, unx * hx + uny * hy + unz * hz);
+        const spec = Math.pow(specDot, 14) * 32.0;
+        // Subtle topographic iso-contour bands every 10% of field range
+        const band = Math.abs((t * 10.0) - Math.round(t * 10.0));
+        const iso = band < 0.055 ? -14.0 : 0.0;
+        // Ambient + directional diffuse shading keeps colors faithful while giving crisp 3D depth
+        const shade = 0.68 + 0.50 * diff;
+
+        const p = (py * CW + px) * 4;
+        img.data[p] = clamp(Math.round(rgb[0] * shade + spec + iso), 0, 255);
+        img.data[p + 1] = clamp(Math.round(rgb[1] * shade + spec + iso), 0, 255);
+        img.data[p + 2] = clamp(Math.round(rgb[2] * shade + spec + iso), 0, 255);
         img.data[p + 3] = 255;
       }
     }
     ctx.putImageData(img, 0, 0);
+  }
+
+  function buildSmoothCoastPath(mask) {
+    // Marching-squares edge-midpoint contour on [H, W] boolean mask for smooth coastlines
+    const H = mask.length;
+    const W = mask[0].length;
+    const segs = [];
+    const at = (i, j) => (i >= 0 && i < H && j >= 0 && j < W && mask[i][j] ? 1 : 0);
+    // Walk each 2x2 cell-center square (i..i+1, j..j+1) in canvas space
+    for (let i = -1; i < H; i++) {
+      for (let j = -1; j < W; j++) {
+        // Canvas y for row r is H - 0.5 - r; x for col c is c + 0.5
+        const tl = at(i + 1, j);
+        const tr = at(i + 1, j + 1);
+        const br = at(i, j + 1);
+        const bl = at(i, j);
+        const code = (tl << 3) | (tr << 2) | (br << 1) | bl;
+        if (code === 0 || code === 15) continue;
+        const x0 = j + 0.5;
+        const x1 = j + 1.5;
+        const xm = j + 1.0;
+        const y0 = H - 0.5 - (i + 1);
+        const y1 = H - 0.5 - i;
+        const ym = (y0 + y1) * 0.5;
+        // Midpoints: top(xm, y0), right(x1, ym), bottom(xm, y1), left(x0, ym)
+        const add = (ax, ay, bx, by) => segs.push(`M${ax.toFixed(2)} ${ay.toFixed(2)}L${bx.toFixed(2)} ${by.toFixed(2)}`);
+        switch (code) {
+          case 1: case 14: add(x0, ym, xm, y1); break;
+          case 2: case 13: add(xm, y1, x1, ym); break;
+          case 3: case 12: add(x0, ym, x1, ym); break;
+          case 4: case 11: add(xm, y0, x1, ym); break;
+          case 5: add(x0, ym, xm, y0); add(xm, y1, x1, ym); break;
+          case 6: case 9: add(xm, y0, xm, y1); break;
+          case 7: case 8: add(x0, ym, xm, y0); break;
+          case 10: add(xm, y0, x1, ym); add(x0, ym, xm, y1); break;
+        }
+      }
+    }
+    return segs.join("");
   }
 
   function buildContourPath(mask) {
@@ -308,7 +474,7 @@
     if (!state.meta) return;
     if (!cachedCoastPath) {
       const land = state.meta.grid.land_sea_mask.map((row) => row.map((v) => v >= 0.5));
-      cachedCoastPath = buildContourPath(land);
+      cachedCoastPath = buildSmoothCoastPath(land);
     }
 
     let shockPath = "";
@@ -375,8 +541,20 @@
         `<line x1="0" y1="${yCell + 0.5}" x2="36" y2="${yCell + 0.5}" stroke="${INK}" stroke-width="0.12" stroke-opacity="0.45"/>`;
     }
 
+    // Subtle 10-degree lat/lon graticule lines
+    let graticule = "";
+    [10, 20, 30].forEach((latVal) => {
+      const gy = 32 - (latVal - 6.5 + 0.5);
+      graticule += `<line x1="0" y1="${gy.toFixed(2)}" x2="36" y2="${gy.toFixed(2)}" stroke="${INK}" stroke-width="0.08" stroke-opacity="0.22" stroke-dasharray="0.4 0.5"/>`;
+    });
+    [70, 80, 90, 100].forEach((lonVal) => {
+      const gx = lonVal - 65.5 + 0.5;
+      graticule += `<line x1="${gx.toFixed(2)}" y1="0" x2="${gx.toFixed(2)}" y2="32" stroke="${INK}" stroke-width="0.08" stroke-opacity="0.22" stroke-dasharray="0.4 0.5"/>`;
+    });
+
     const svgInner =
-      `<path d="${cachedCoastPath}" fill="none" stroke="${INK}" stroke-width="0.16" stroke-opacity="0.85"/>` +
+      graticule +
+      `<path d="${cachedCoastPath}" fill="none" stroke="${INK}" stroke-width="0.20" stroke-opacity="0.88"/>` +
       shockPath +
       customMarker +
       ghostMarker +
@@ -756,6 +934,20 @@
     const m = imp.multiverse;
     const d = imp.delta;
     el.impactTitle.textContent = `Physical Proxy Impacts (over ${imp.steps} days)`;
+
+    if (el.impactSummaryBanner) {
+      if (state.runData && state.runData.max_abs_diff === 0) {
+        el.impactSummaryBanner.textContent = "Null shock check: Multiverse matches Prime identically across all land impact indicators.";
+      } else {
+        const hwD = d.heatwave_cell_days.abs;
+        const defD = d.rain_deficit_share.abs * 100.0;
+        const csiD = d.crop_stress_csi.abs;
+        el.impactSummaryBanner.textContent =
+          `Over ${imp.steps} days: heatwave ${hwD >= 0 ? "+" : ""}${formatNum(hwD, 0)} cell-days, ` +
+          `rain deficit ${defD >= 0 ? "+" : ""}${formatNum(defD, 2)} pp, ` +
+          `crop stress CSI ${csiD >= 0 ? "+" : ""}${formatNum(csiD, 4)}.`;
+      }
+    }
 
     const rows = [
       {
@@ -1306,6 +1498,17 @@
     if (el.downloadPngBtn) el.downloadPngBtn.addEventListener("click", downloadMapPng);
     if (el.downloadCsvBtn) el.downloadCsvBtn.addEventListener("click", downloadTimeseriesCsv);
     if (el.downloadJsonBtn) el.downloadJsonBtn.addEventListener("click", downloadImpactJson);
+
+    if (el.reliefToggleBtn) {
+      el.reliefToggleBtn.addEventListener("click", () => {
+        state.relief3d = !state.relief3d;
+        el.reliefToggleBtn.classList.toggle("active-pill", state.relief3d);
+        el.reliefToggleBtn.setAttribute("aria-pressed", String(state.relief3d));
+        el.reliefToggleBtn.textContent = state.relief3d ? "3D Relief" : "Flat Grid";
+        document.querySelectorAll(".map-frame").forEach((f) => f.classList.toggle("flat-frame", !state.relief3d));
+        renderMapsAndColorbars();
+      });
+    }
 
     el.loadHistoryBtn.addEventListener("click", async () => {
       showError("");

@@ -276,6 +276,7 @@
             <datalist id="dayTicks"></datalist>
             <button id="nextDayBtn" type="button" class="btn-mini mono" title="Next day (Right arrow)" aria-label="Next day">&gt;</button>
             <span id="dayReadout" class="mono day-readout">Day 1 / 10 (DOY 167)</span>
+            <button id="reliefToggleBtn" type="button" class="btn-mini active-pill mono" title="Toggle 3D hillshaded relief vs raw 1° grid cells" aria-pressed="true">3D Relief</button>
             <div class="export-group" role="group" aria-label="Download outputs">
               <button id="downloadPngBtn" type="button" class="btn-mini mono" title="Download 3-panel map PNG">PNG</button>
               <button id="downloadCsvBtn" type="button" class="btn-mini mono" title="Download time-series CSV">CSV</button>
@@ -370,6 +371,7 @@
               <h3 class="panel-title" id="impactTitle">Physical Proxy Impacts (over 10 days)</h3>
               <span class="proxy-pill mono">proxy, not a forecast</span>
             </div>
+            <div id="impactSummaryBanner" class="impact-summary small-note muted-text">Run an experiment to see a plain-language summary of how the shock shifts land impacts.</div>
             <table class="impact-table">
               <thead>
                 <tr>
