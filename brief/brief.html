@@ -2,20 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Multiverse of Monsoon — Technical Brief</title>
+  <title>Multiverse of Monsoon — Project Brief</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm 11mm;
+      margin: 9.5mm 11mm;
     }
     :root {
-      --paper: #f4f1ea;
-      --ink: #1d1d1b;
-      --muted: #5a564e;
-      --rule: #cfc9bb;
-      --panel: #faf8f3;
-      --accent: #0f5c5c;
-      --shock: #c8402a;
+      --bg: #eef1f4;
+      --card: #ffffff;
+      --soft: #f7f8fa;
+      --ink: #111827;
+      --muted: #4b5563;
+      --rule: #cfd6df;
+      --navy: #1e3a5f;
+      --navy-tint: #ebf0f6;
+      --crimson: #b91c1c;
+      --crimson-tint: #fef2f2;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -24,8 +27,8 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--ink);
       background: #ffffff;
-      font-size: 9.2pt;
-      line-height: 1.32;
+      font-size: 8.85pt;
+      line-height: 1.33;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
@@ -35,73 +38,143 @@
     }
     .page {
       width: 100%;
-      max-height: 274mm;
+      height: 277mm;
+      max-height: 277mm;
       overflow: hidden;
       page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
-    .page:last-child {
-      page-break-after: auto;
-    }
-    header {
-      border-bottom: 1.5px solid var(--ink);
-      padding-bottom: 4px;
-      margin-bottom: 7px;
+    .page:last-child { page-break-after: auto; }
+
+    /* Top Header */
+    .hdr {
       display: flex;
       justify-content: space-between;
-      align-items: baseline;
+      align-items: flex-end;
+      border-bottom: 2px solid var(--navy);
+      padding-bottom: 4px;
     }
-    header h1 {
+    .hdr-title {
       margin: 0;
-      font-size: 14pt;
+      font-size: 13.5pt;
       font-weight: 700;
+      color: var(--navy);
       letter-spacing: -0.01em;
     }
-    header .sub {
-      font-size: 8.5pt;
+    .hdr-meta {
+      font-size: 7.9pt;
+      color: var(--muted);
+      text-align: right;
+    }
+
+    /* Callout Banners */
+    .usp-bar {
+      background: var(--navy-tint);
+      border-left: 3.5px solid var(--navy);
+      padding: 4.5px 8px;
+      font-size: 8.4pt;
+      border-radius: 2px;
+    }
+    .warn-box {
+      background: var(--crimson-tint);
+      border-left: 3.5px solid var(--crimson);
+      padding: 4.5px 8px;
+      font-size: 8.1pt;
+      border-radius: 2px;
+    }
+
+    /* KPI Strip */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .kpi {
+      background: var(--soft);
+      border: 1px solid var(--rule);
+      border-top: 2px solid var(--navy);
+      padding: 3.5px 6px;
+      border-radius: 2px;
+    }
+    .kpi-val {
+      font-size: 11pt;
+      font-weight: 700;
+      color: var(--navy);
+      line-height: 1.15;
+    }
+    .kpi-lbl {
+      font-size: 7.4pt;
       color: var(--muted);
     }
+
     h2 {
-      margin: 6px 0 3px 0;
-      font-size: 10pt;
+      margin: 0 0 3px 0;
+      font-size: 9.6pt;
       font-weight: 700;
-      color: var(--accent);
+      color: var(--navy);
       border-bottom: 1px solid var(--rule);
-      padding-bottom: 1px;
+      padding-bottom: 1.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
     }
-    p {
-      margin: 0 0 4px 0;
-    }
-    ul {
-      margin: 2px 0 5px 0;
-      padding-left: 15px;
-    }
-    li {
-      margin-bottom: 2px;
-    }
+    p { margin: 0 0 3.5px 0; }
+    ul { margin: 1px 0 3px 0; padding-left: 14px; }
+    li { margin-bottom: 1.8px; }
+
     .two-col {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 8px;
       align-items: start;
     }
+    .three-col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
     .card {
-      background: var(--panel);
+      background: var(--soft);
       border: 1px solid var(--rule);
+      border-radius: 2px;
       padding: 5px 7px;
     }
+
+    /* Pipeline flow */
+    .pipe {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      gap: 4px;
+      align-items: center;
+      background: var(--soft);
+      border: 1px solid var(--rule);
+      padding: 4.5px 6px;
+      border-radius: 2px;
+      font-size: 7.7pt;
+    }
+    .pipe-step {
+      background: var(--card);
+      border: 1px solid var(--rule);
+      padding: 3px 5px;
+      border-radius: 2px;
+      text-align: center;
+    }
+    .pipe-step strong { display: block; color: var(--navy); font-size: 7.9pt; }
+    .pipe-arr { color: var(--navy); font-weight: 700; font-size: 10pt; }
+
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 8.2pt;
-      margin: 3px 0 4px 0;
+      font-size: 7.9pt;
     }
     th, td {
       border-bottom: 1px solid var(--rule);
-      padding: 2.2px 4px;
+      padding: 2px 4px;
       text-align: left;
     }
     th {
-      background: var(--paper);
+      background: var(--bg);
       font-weight: 600;
       color: var(--ink);
     }
@@ -110,11 +183,14 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-variant-numeric: tabular-nums;
     }
+    tr.hi td { font-weight: 700; background: var(--navy-tint); }
+
     figure {
       margin: 0;
+      background: var(--card);
       border: 1px solid var(--rule);
-      background: #ffffff;
-      padding: 4px;
+      border-radius: 2px;
+      padding: 3.5px;
     }
     figure img {
       width: 100%;
@@ -122,178 +198,173 @@
       display: block;
     }
     figcaption {
-      margin-top: 3px;
-      font-size: 7.9pt;
+      margin-top: 2.5px;
+      font-size: 7.5pt;
       color: var(--muted);
-      line-height: 1.25;
-    }
-    .caption-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 7px;
-      margin-top: 4px;
-      font-size: 7.9pt;
-      color: var(--muted);
-    }
-    .caption-grid div {
-      background: var(--panel);
-      border: 1px solid var(--rule);
-      padding: 3.5px 5px;
       line-height: 1.24;
     }
-    .caption-grid strong {
-      color: var(--ink);
+    .cap-card {
+      background: var(--soft);
+      border: 1px solid var(--rule);
+      padding: 3.5px 5.5px;
+      font-size: 7.6pt;
+      color: var(--muted);
+      line-height: 1.24;
+      border-radius: 2px;
     }
-    .warn-box {
-      border-left: 3px solid var(--shock);
-      background: var(--panel);
-      padding: 4px 7px;
-      font-size: 8.4pt;
-    }
-    .usp-box {
-      border-left: 3px solid var(--accent);
-      background: var(--paper);
-      padding: 3.5px 7px;
-      margin-bottom: 5px;
-      font-size: 8.3pt;
-      line-height: 1.26;
-    }
+    .cap-card strong { color: var(--ink); }
   </style>
 </head>
 <body>
+  <!-- ==================== PAGE 1: PROJECT, APPROACH & IMPLEMENTATION ==================== -->
   <section class="page">
-    <header>
-      <h1>Multiverse of Monsoon — Technical Brief</h1>
-      <span class="sub mono">32×36 @ 1° (6.5°–37.5°N, 65.5°–100.5°E) · Daily Counterfactual Surrogate</span>
-    </header>
+    <div class="hdr">
+      <h1 class="hdr-title">Multiverse of Monsoon — Project Brief</h1>
+      <div class="hdr-meta mono">Counterfactual Climate Digital Twin · 32×36 @ 1° (6.5°–37.5°N, 65.5°–100.5°E) · CPU Surrogate</div>
+    </div>
 
-    <div class="usp-box">
-      <strong>Unique Selling Proposition (USP):</strong> A compact <span class="mono">175,123</span>-parameter CPU surrogate (<span class="mono">&lt;150 ms</span> per 10-step rollout) with a hard <span class="mono">3</span>-cell local receptive radius, separating Forecast Prime (<span class="mono">beta</span>-shrunk minimum-RMSE) from Counterfactual Multiverse (<span class="mono">V1</span> unshrunk dynamical perturbation bounded by a causal cone and <span class="mono">4σ</span> cap) and coupling live rollouts to a 3D-relief observatory dashboard and land impact proxies.
+    <div class="usp-bar">
+      <strong>Project Goal &amp; USP:</strong> Given 3 days of atmospheric state (<span class="mono">t2m, tp, u10, v10, msl, tcwv</span>), <em>Multiverse of Monsoon</em> rolls out calibrated 1–60 day baseline forecasts (<strong>Prime</strong>) alongside localized counterfactual experiments (<strong>Multiverse</strong>) in <span class="mono">&lt;180 ms</span> on CPU. Its core design enforces a hard <span class="mono">3</span>-cell per-step receptive radius, separates forecast-uncertainty shrinkage from <span class="mono">V1</span> causal shock dynamics, and links rollouts live to land impact proxies in a 3D Swiss-cartography observatory UI.
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-val mono">175,123</div><div class="kpi-lbl">Parameters (<span class="mono">C=128</span>, 2 blocks, r=3)</div></div>
+      <div class="kpi"><div class="kpi-val mono">+0.1484</div><div class="kpi-lbl">Mean Skill vs Best Baseline (L1/4/8)</div></div>
+      <div class="kpi"><div class="kpi-val mono">0.12–0.18 s</div><div class="kpi-lbl">10-Step CPU Latency (<span class="mono">~303 MB</span> RAM)</div></div>
+      <div class="kpi"><div class="kpi-val mono">29/29 · 15/15</div><div class="kpi-lbl">Pytest Suite &amp; Repo Integrity Scan</div></div>
+    </div>
+
+    <div class="pipe">
+      <div class="pipe-step"><strong>1. Anomaly Transform</strong>Harmonic clim (<span class="mono">K=4, T=365</span>)<br><span class="mono">log1p(tp)</span>, train <span class="mono">σ_pix</span> norm</div>
+      <div class="pipe-arr">→</div>
+      <div class="pipe-step"><strong>2. Local Rollout Core</strong><span class="mono">MonsoonNet</span> damped persistence<br><span class="mono">ρ ≈ 0.83–0.85/d</span> + <span class="mono">±5σ</span> clamp</div>
+      <div class="pipe-arr">→</div>
+      <div class="pipe-step"><strong>3. Out-of-Loop Calibration</strong><span class="mono">beta</span> shrink · <span class="mono">kappa</span> rain debias<br><span class="mono">pattern_gain (g8=1.4)</span> + event head</div>
+      <div class="pipe-arr">→</div>
+      <div class="pipe-step"><strong>4. Multiverse &amp; Impact</strong><span class="mono">V1</span> unshrunk diff · causal cone<br><span class="mono">4σ</span> cap → <span class="mono">736</span>-cell land proxies</div>
     </div>
 
     <div class="two-col">
       <div class="card">
-        <h2>1. Model Design &amp; Local Physics</h2>
-        <p>
-          Predictions operate in standardized anomaly space relative to a train-fitted 4-harmonic daily climatology
-          (<span class="mono">period=365</span>, <span class="mono">K=4</span>; precipitation transformed via <span class="mono">log1p</span>/<span class="mono">expm1</span>).
-          <span class="mono">MonsoonNet</span> (<span class="mono">175,123</span> parameters) predicts 1-day innovations over learned per-channel damped persistence
-          (<span class="mono">sigmoid(rho_logit) ≈ 0.83–0.85/day</span>) plus an auxiliary <span class="mono">10 mm/day</span> heavy-rain event head.
-          Spatial operators use strictly local <span class="mono">3×3</span> stem convolution, two depthwise-separable residual blocks
-          (<span class="mono">C=128</span>), replicate boundary padding, and per-pixel <span class="mono">LN2d</span> normalization—enforcing a hard per-step receptive radius of <span class="mono">3</span> grid cells with no global pooling or attention.
-        </p>
+        <h2>1. Modeling Approach</h2>
+        <ul>
+          <li><strong>Anomaly Formulation:</strong> Subtracting a train-fitted 4-harmonic seasonal cycle isolates synoptic departures from seasonal climatology; precipitation uses <span class="mono">log1p/expm1</span>.</li>
+          <li><strong>Strictly Local Operator:</strong> <span class="mono">MonsoonNet</span> takes <span class="mono">cin=34</span> features (3-day history, day-to-day tendency, climatology, static <span class="mono">land_sea_mask</span> &amp; orography, <span class="mono">sin/cos DOY</span>) through a <span class="mono">3×3</span> stem, two depthwise-separable residual blocks (<span class="mono">C=128</span>), replicate padding, and per-pixel <span class="mono">LN2d</span>. Zero global pooling enforces a hard <span class="mono">3</span>-cell Chebyshev radius per step.</li>
+          <li><strong>Damped Persistence &amp; Event Head:</strong> Predicts <span class="mono">a_{t+1} = sigmoid(ρ)·a_t + scale·head(h)</span> plus a heavy-rain (<span class="mono">≥10 mm/d</span>) logit head.</li>
+        </ul>
       </div>
 
       <div class="card">
-        <h2>2. Drift &amp; Blur Control</h2>
+        <h2>2. Stability, Anti-Blur &amp; Shocks</h2>
         <ul>
-          <li><strong>Drift control:</strong> Stage A (<span class="mono">25</span> epochs, <span class="mono">Huber + 0.2 BCE + 0.05 GradDiff</span>) is followed by Stage B multi-step BPTT (<span class="mono">K=2</span>×3, <span class="mono">K=4</span>×4, <span class="mono">K=8</span>×4 epochs), <span class="mono">±5σ</span> rollout anomaly clamping (<span class="mono">&lt;0.004%</span> clamp hits across 200 noisy-start 30-day rollouts; 0 NaNs across 300 runs), and validation-fitted <span class="mono">beta</span> output shrinkage.</li>
-          <li><strong>Blur control:</strong> Out-of-loop post-processing applies <span class="mono">kappa</span> multiplicative rain debiasing, <span class="mono">tp</span> pattern gain (<span class="mono">g8=1.4</span>), and event-head rain coupling, holding day-8 spatial variance ratios above the <span class="mono">0.40</span> floor (<span class="mono">0.4846</span> for <span class="mono">tp</span>; <span class="mono">0.6223–1.0447</span> across other channels).</li>
+          <li><strong>Two-Stage Training:</strong> Stage A (<span class="mono">25</span> epochs, <span class="mono">Huber + 0.2 BCE + 0.05 GradDiff</span>, EMA) stabilizes 1-day dynamics; Stage B unrolls multi-step BPTT (<span class="mono">K=2×3, K=4×4, K=8×4</span>) with <span class="mono">±5σ</span> anomaly clamps to prevent multi-week drift.</li>
+          <li><strong>Blur Prevention:</strong> Validation-fitted out-of-loop <span class="mono">beta</span> shrinkage curbs error growth, while <span class="mono">kappa</span> debiasing, <span class="mono">tp</span> pattern gain (<span class="mono">g8=1.4</span>), and event-head blending keep day-8 variance ratios above <span class="mono">0.40</span>.</li>
+          <li><strong><span class="mono">V1</span> Counterfactual Serving:</strong> Prime keeps <span class="mono">beta</span> shrinkage; shocked runs extract <span class="mono">pert_nb − ctrl_nb</span> without <span class="mono">beta</span> attenuation, gate propagation with a causal cone (<span class="mono">speed=3.0</span> cells/d, <span class="mono">taper=1.5</span>), and cap responses at <span class="mono">±4σ</span>. Exact zero shocks return Prime identically.</li>
         </ul>
       </div>
     </div>
 
-    <h2>3. Forecast Accuracy vs Baselines (N = 50 Unseen Test Windows)</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Lead</th>
-          <th>Method</th>
-          <th class="num">t2m (K)</th>
-          <th class="num">tp (mm/d)</th>
-          <th class="num">u10 (m/s)</th>
-          <th class="num">v10 (m/s)</th>
-          <th class="num">msl (Pa)</th>
-          <th class="num">tcwv (kg/m²)</th>
-          <th class="num">Mean Skill</th>
-          <th class="num">CSI ≥10mm</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>Day 1</td><td>Persistence</td><td class="num">1.0669</td><td class="num">5.5995</td><td class="num">1.0470</td><td class="num">1.0688</td><td class="num">214.59</td><td class="num">3.7993</td><td class="num">+0.0000</td><td class="num">0.3939</td></tr>
-        <tr><td>Day 1</td><td>Empirical Clim.</td><td class="num">1.8355</td><td class="num">6.2485</td><td class="num">1.7846</td><td class="num">1.4985</td><td class="num">285.62</td><td class="num">7.0769</td><td class="num">-0.5228</td><td class="num">0.2237</td></tr>
-        <tr><td>Day 1</td><td><strong>Model (postproc)</strong></td><td class="num"><strong>0.7075</strong></td><td class="num"><strong>4.1760</strong></td><td class="num"><strong>0.7772</strong></td><td class="num"><strong>0.7558</strong></td><td class="num"><strong>143.71</strong></td><td class="num"><strong>2.4388</strong></td><td class="num"><strong>+0.3050</strong></td><td class="num"><strong>0.5166</strong></td></tr>
-        <tr><td>Day 4</td><td>Persistence</td><td class="num">1.9297</td><td class="num">8.9663</td><td class="num">2.0658</td><td class="num">1.9708</td><td class="num">386.51</td><td class="num">7.4710</td><td class="num">-0.2176</td><td class="num">0.2089</td></tr>
-        <tr><td>Day 4</td><td>Empirical Clim.</td><td class="num">1.8447</td><td class="num">7.2272</td><td class="num">1.6122</td><td class="num">1.4963</td><td class="num">286.10</td><td class="num">7.0727</td><td class="num">-0.0020</td><td class="num">0.2848</td></tr>
-        <tr><td>Day 4</td><td><strong>Model (postproc)</strong></td><td class="num"><strong>1.4807</strong></td><td class="num"><strong>6.8801</strong></td><td class="num"><strong>1.3958</strong></td><td class="num"><strong>1.3479</strong></td><td class="num"><strong>266.12</strong></td><td class="num"><strong>5.5892</strong></td><td class="num"><strong>+0.1248</strong></td><td class="num"><strong>0.3924</strong></td></tr>
-        <tr><td>Day 8</td><td>Persistence</td><td class="num">2.2584</td><td class="num">10.6877</td><td class="num">2.5696</td><td class="num">2.1059</td><td class="num">451.87</td><td class="num">9.0565</td><td class="num">-0.3006</td><td class="num">0.1714</td></tr>
-        <tr><td>Day 8</td><td>Empirical Clim.</td><td class="num">1.9318</td><td class="num">8.8115</td><td class="num">1.7954</td><td class="num">1.5766</td><td class="num">323.45</td><td class="num">7.2669</td><td class="num">-0.0015</td><td class="num">0.2995</td></tr>
-        <tr><td>Day 8</td><td><strong>Model (postproc)</strong></td><td class="num"><strong>1.8638</strong></td><td class="num"><strong>8.9220</strong></td><td class="num"><strong>1.7523</strong></td><td class="num"><strong>1.5647</strong></td><td class="num"><strong>318.95</strong></td><td class="num"><strong>7.0268</strong></td><td class="num"><strong>+0.0154</strong></td><td class="num"><strong>0.3494</strong></td></tr>
-      </tbody>
-    </table>
-
-    <div class="two-col" style="margin-top:4px;">
-      <figure>
-        <img src="figures/skill_vs_lead.png" alt="Skill vs Lead Day">
-        <figcaption>Skill vs best baseline declines from <span class="mono">+0.3050</span> (day 1) to <span class="mono">+0.0154</span> (day 8) and <span class="mono">-0.0026</span> (day 10).</figcaption>
-      </figure>
-      <figure>
-        <img src="figures/variance_ratio.png" alt="Day-8 Variance Ratio">
-        <figcaption>Day-8 variance ratios exceed the <span class="mono">0.40</span> floor across all 6 channels (<span class="mono">tp=0.48</span> vs empirical clim <span class="mono">0.27</span>).</figcaption>
-      </figure>
+    <div class="card">
+      <h2>3. System Implementation &amp; Offline Architecture</h2>
+      <div class="two-col" style="gap:10px;">
+        <ul style="margin-bottom:0;">
+          <li><strong>Offline Inference API (<span class="mono">serve.py</span>):</strong> Self-contained FastAPI server loading bundled weights from <span class="mono">weights/</span> (<span class="mono">model.pt, postproc.json, clim_harmonics.npz, norm.npz, static.npz</span>) on startup with warmup, thread-safe lock, strict <span class="mono">400</span> validation, <span class="mono">POST /health</span>, and <span class="mono">POST /simulate</span>. Runs offline on 4 CPU threads without writing to disk.</li>
+        </ul>
+        <ul style="margin-bottom:0;">
+          <li><strong>Observatory Dashboard (<span class="mono">dashboard/</span>):</strong> Separate FastAPI proxy + dependency-free vanilla HTML/CSS/JS frontend with smooth marching-squares coastlines, <span class="mono">360×320</span> Lambertian 3D relief maps, synchronized crosshairs, drag-to-draw custom shocks, and live <span class="mono">monsoon/impact.py</span> land proxies.</li>
+        </ul>
+      </div>
     </div>
 
-    <h2>4. Known Failure Modes &amp; Shock Bounds</h2>
-    <div class="warn-box">
-      <ul>
-        <li><strong>Long-lead predictability &amp; resolution limits:</strong> By day 8 mean skill is <span class="mono">+0.0154</span> (near climatology), day-8 <span class="mono">tp</span> variance ratio is <span class="mono">0.4846</span> vs the <span class="mono">0.40</span> floor, extreme rainfall tails are underestimated, and tropical cyclone tracks are unresolved on the <span class="mono">1°</span> daily grid.</li>
-        <li><strong>Surrogate counterfactuals:</strong> Perturbation responses reflect learned local dynamics (<span class="mono">V1</span> unshrunk dynamical difference bounded by cone <span class="mono">speed=3.0</span> and <span class="mono">4σ</span> cap), not causal ground truth. <span class="mono">warm_ocean</span> passes all causality checks on <span class="mono">100.0%</span> (<span class="mono">96/96</span>) of held-out windows, while <span class="mono">monsoon_stall</span> passes <span class="mono">propagates</span> in <span class="mono">45.8%</span> (<span class="mono">44/96</span>; <span class="mono">65.4%</span> of failures have below-median box winds and <span class="mono">~35%</span> occur even at higher winds due to <span class="mono">~0.83/day</span> damping).</li>
-        <li><strong>Temporal generalization:</strong> Unseen evaluation windows lie after the historical training archive period, so out-of-distribution shifts may yield lower scores than local test windows.</li>
-      </ul>
+    <div class="two-col">
+      <figure>
+        <img src="figures/skill_vs_lead.png" alt="Skill vs Lead Day" style="max-height:50mm; width:auto; margin:0 auto;">
+        <figcaption><strong>Test Skill Trajectory:</strong> Positive skill above persistence and climatology across leads 1–9 (<span class="mono">+0.3050</span> D1, <span class="mono">+0.1248</span> D4, <span class="mono">+0.0154</span> D8) before converging near climatology by day 10.</figcaption>
+      </figure>
+      <figure>
+        <img src="figures/variance_ratio.png" alt="Day-8 Variance Ratio" style="max-height:50mm; width:auto; margin:0 auto;">
+        <figcaption><strong>Anti-Blur Check (Day 8):</strong> Spatial variance ratio stays above the <span class="mono">0.40</span> floor across all 6 channels (<span class="mono">tp = 0.4846</span> vs empirical climatology <span class="mono">0.2718</span>).</figcaption>
+      </figure>
     </div>
   </section>
 
+  <!-- ==================== PAGE 2: KEY OUTCOMES, DASHBOARD & LIMITS ==================== -->
   <section class="page">
-    <header>
-      <h1>Interactive Dashboard, Shock Propagation &amp; Impact Proxies</h1>
-      <span class="sub mono">Live FastAPI Proxy + Vanilla Canvas/SVG UI · Page 2</span>
-    </header>
+    <div class="hdr">
+      <h1 class="hdr-title">Key Outcomes, Live Counterfactual Explorer &amp; Limits</h1>
+      <div class="hdr-meta mono">50 Unseen Test Windows · 96 De-Duplicated Shock Windows · Live Dashboard Verification</div>
+    </div>
+
+    <div>
+      <h2>4. Quantitative Benchmark Outcomes (Unseen Test Split, N = 50 Windows)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Lead</th>
+            <th>Method</th>
+            <th class="num">t2m (K)</th>
+            <th class="num">tp (mm/d)</th>
+            <th class="num">u10 (m/s)</th>
+            <th class="num">v10 (m/s)</th>
+            <th class="num">msl (Pa)</th>
+            <th class="num">tcwv (kg/m²)</th>
+            <th class="num">Mean Skill</th>
+            <th class="num">CSI ≥10mm</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Day 1</td><td>Best Baseline (Persistence)</td><td class="num">1.0669</td><td class="num">5.5995</td><td class="num">1.0470</td><td class="num">1.0688</td><td class="num">214.59</td><td class="num">3.7993</td><td class="num">+0.0000</td><td class="num">0.3939</td></tr>
+          <tr class="hi"><td>Day 1</td><td>MonsoonNet (C=128 + postproc)</td><td class="num">0.7075</td><td class="num">4.1760</td><td class="num">0.7772</td><td class="num">0.7558</td><td class="num">143.71</td><td class="num">2.4388</td><td class="num">+0.3050</td><td class="num">0.5166</td></tr>
+          <tr><td>Day 4</td><td>Best Baseline (Empirical Clim.)</td><td class="num">1.8447</td><td class="num">7.2272</td><td class="num">1.6122</td><td class="num">1.4963</td><td class="num">286.10</td><td class="num">7.0727</td><td class="num">-0.0020</td><td class="num">0.2848</td></tr>
+          <tr class="hi"><td>Day 4</td><td>MonsoonNet (C=128 + postproc)</td><td class="num">1.4807</td><td class="num">6.8801</td><td class="num">1.3958</td><td class="num">1.3479</td><td class="num">266.12</td><td class="num">5.5892</td><td class="num">+0.1248</td><td class="num">0.3924</td></tr>
+          <tr><td>Day 8</td><td>Best Baseline (Empirical Clim.)</td><td class="num">1.9318</td><td class="num">8.8115</td><td class="num">1.7954</td><td class="num">1.5766</td><td class="num">323.45</td><td class="num">7.2669</td><td class="num">-0.0015</td><td class="num">0.2995</td></tr>
+          <tr class="hi"><td>Day 8</td><td>MonsoonNet (C=128 + postproc)</td><td class="num">1.8638</td><td class="num">8.9220</td><td class="num">1.7523</td><td class="num">1.5647</td><td class="num">318.95</td><td class="num">7.0268</td><td class="num">+0.0154</td><td class="num">0.3494</td></tr>
+        </tbody>
+      </table>
+      <p style="font-size:7.8pt; color:var(--muted); margin-top:2px;">
+        <strong>Stability &amp; Causality:</strong> Across <span class="mono">300</span> 30-step rollouts (incl. <span class="mono">200</span> 1σ noisy starts): <span class="mono">0</span> NaN/Inf, <span class="mono">min tp = 0.0</span>, <span class="mono">t2m ∈ [-32.76, +43.33] °C</span>, <span class="mono">±5σ</span> clamp hits <span class="mono">&lt;0.004%</span>. Across <span class="mono">96</span> shock windows: <span class="mono">warm_ocean</span> passes all checks <span class="mono">100.0%</span> (<span class="mono">96/96</span>); <span class="mono">null</span> is exact <span class="mono">0.0</span>; <span class="mono">monsoon_stall</span> passes <span class="mono">localized/no_teleport/stable 100%</span> and <span class="mono">propagates 45.8%</span> (<span class="mono">44/96</span>).
+      </p>
+    </div>
 
     <figure>
-      <img src="figures/dashboard.png" alt="Running Dashboard Screenshot" style="max-height: 98mm; width: auto; margin: 0 auto;">
-      <div class="caption-grid">
-        <div><strong>3D Cartographic Maps:</strong> Side-by-side Prime, Multiverse, and Difference <span class="mono">360×320</span> hillshaded 3D relief maps with smooth marching-squares coastlines, iso-contours, and a <span class="mono">Flat Grid</span> toggle.</div>
-        <div><strong>Live Experiment Controls:</strong> Smooth climatology DOY init (<span class="mono">1–365</span>), drag-and-drop <span class="mono">.npz/.json</span> upload, interactive drag-to-draw custom shocks, and domain-mean trajectories.</div>
-        <div><strong>Audit &amp; Plain-Language Summary:</strong> Live <span class="mono">/api/health</span> &amp; round-trip timings, Null preset (<span class="mono">max|Δ|=0.0</span>), PNG/CSV/JSON export, and auto-generated impact summary banner.</div>
+      <img src="figures/dashboard.png" alt="Swiss Cartography 3D Dashboard Screenshot" style="max-height:82mm; width:auto; margin:0 auto;">
+      <div class="three-col" style="margin-top:4px;">
+        <div class="cap-card"><strong>3D Cartographic Maps:</strong> Side-by-side Prime, Multiverse &amp; Difference rendered via <span class="mono">360×320</span> Lambertian relief, iso-contours &amp; marching-squares coastlines (<span class="mono">Flat Grid</span> toggle included).</div>
+        <div class="cap-card"><strong>Interactive Shocks:</strong> Smooth climatology DOY init, drag-and-drop <span class="mono">.npz/.json</span> state upload, presets, or drag-to-draw custom circle/rect perturbations directly on the map.</div>
+        <div class="cap-card"><strong>Trajectories &amp; Export:</strong> Synchronized crosshairs, domain-mean SVG plots (all vs land), PNG/CSV/JSON export, 5-run history, and live plain-English impact summary.</div>
       </div>
     </figure>
 
-    <div class="two-col" style="margin-top:6px;">
+    <div class="two-col">
       <div>
         <h2>5. Counterfactual Spatial Evolution</h2>
         <figure>
-          <img src="figures/shock_4panel.png" alt="Warm Bay of Bengal 4-panel response">
+          <img src="figures/shock_4panel.png" alt="Warm Bay of Bengal 4-panel response" style="max-height:46mm; width:auto; margin:0 auto;">
           <figcaption>
-            Live <span class="mono">monsoon.infer.Simulator</span> response to <span class="mono">warm_ocean</span> on test window <span class="mono">t=6027</span> (<span class="mono">DOY=184</span>) at days 1, 3, 6, 10:
-            <span class="mono">t2m</span> box mean cools from <span class="mono">+2.11 K</span> to <span class="mono">+0.46 K</span> while <span class="mono">tp</span> peaks near day 1–3 (<span class="mono">+13.67 mm/d</span>) and advects outward within the causal cone.
+            <span class="mono">warm_ocean</span> rollout (<span class="mono">t=6027, DOY=184</span>): Bay of Bengal warming decays from <span class="mono">+2.11 K</span> (D1) to <span class="mono">+0.46 K</span> (D10) as convective rainfall peaks (<span class="mono">+13.67 mm/d</span>) and spreads inside the causal cone.
           </figcaption>
         </figure>
       </div>
 
-      <div>
-        <h2>6. Impact Proxies &amp; Live Measurements</h2>
+      <div style="display:flex; flex-direction:column; gap:5px;">
         <div class="card">
-          <p>
-            <span class="mono">monsoon/impact.py</span> compares 10-day physical rollouts against <span class="mono">expm1</span> harmonic climatology across <span class="mono">736</span> land cells:
-            heatwave land cell-days (<span class="mono">t2m ≥ +3 K</span> for <span class="mono">≥2</span> consecutive days), heavy-rain shares (<span class="mono">≥64.5</span> and <span class="mono">≥115.6 mm/d</span>), rain deficit (<span class="mono">&gt;20%</span> below clim.), and lat-weighted crop stress (<span class="mono">CSI</span>).
-          </p>
+          <h2>6. Live Land Impact Proxies (<span class="mono">/api/run</span>, DOY 166)</h2>
           <table>
             <thead>
-              <tr><th>Live <span class="mono">/api/run</span> Case (DOY 166, 10 d)</th><th class="num">Metric Change (Prime → Multiverse)</th></tr>
+              <tr><th>Scenario (10 days, 736 land cells)</th><th class="num">Prime → Multiverse</th></tr>
             </thead>
             <tbody>
-              <tr><td><span class="mono">warm_bay_of_bengal</span> (ocean box)</td><td class="num">Deficit <span class="mono">31.79%→38.32%</span> · CSI <span class="mono">0.1154→0.1377</span> · HW <span class="mono">0→0</span></td></tr>
-              <tr><td>Land shock (<span class="mono">22°N,78°E, r=8, +6 K t2m</span>)</td><td class="num">HW <span class="mono">0→34 cell-d</span> · CSI <span class="mono">0.1154→0.1373</span> · Deficit <span class="mono">31.79%→32.88%</span></td></tr>
+              <tr><td><span class="mono">warm_bay_of_bengal</span></td><td class="num">Deficit <span class="mono">31.79%→38.32%</span> · CSI <span class="mono">0.1154→0.1377</span></td></tr>
+              <tr><td>Custom Land (<span class="mono">22°N,78°E, r=8, +6K</span>)</td><td class="num">Heatwave <span class="mono">0→34 cell-d</span> · CSI <span class="mono">0.1154→0.1373</span></td></tr>
             </tbody>
           </table>
-          <p style="margin-top:3px;">
-            For <span class="mono">warm_bay_of_bengal</span> (<span class="mono">doy=166</span>), near-box (<span class="mono">≤3</span> cells) <span class="mono">t2m</span> Difference energy drops from <span class="mono">1.0000</span> on day 1 (<span class="mono">box mean +2.0232 K</span>, <span class="mono">max|Δ| 2.6234 K</span>) to <span class="mono">0.4556</span> on day 10 (<span class="mono">box mean +0.3982 K</span>, <span class="mono">max|Δ| 1.2271 K</span>) as energy spreads outward.
+          <p style="margin:3px 0 0 0; font-size:7.6pt; color:var(--muted);">
+            Near-box (<span class="mono">≤3</span> cells) <span class="mono">t2m</span> Δ energy drops from <span class="mono">1.0000</span> (D1) to <span class="mono">0.4556</span> (D10) as energy disperses.
           </p>
         </div>
 
-        <h2>7. Proxy Limits &amp; Responsible Use</h2>
         <div class="warn-box">
-          All impact indicators are heuristic indices derived from <span class="mono">1°</span> daily grid-box averages without local crop calendars, soil hydrology, irrigation, or population exposure maps. Short 5–10 day deficit and CSI shifts reflect synoptic variability and must not be used as operational forecasts or agricultural advisories.
+          <strong>Key Limitations &amp; Responsible Use:</strong> Skill decays near climatology by day 8 (<span class="mono">+0.0154</span>), extreme tails and cyclone tracks are smoothed at <span class="mono">1°</span> daily resolution, weak Arabian Sea winds damp <span class="mono">-40%</span> stall shocks (<span class="mono">45.8%</span> propagate rate), out-of-archive future years may score lower, and <span class="mono">impact.py</span> outputs are experimental surrogate indices rather than operational advisories.
         </div>
       </div>
     </div>
